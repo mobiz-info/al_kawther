@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between">
+    <h4 class="fw-medium mb-0">Tax Invoice فاتورة ضريبية</h4>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Invoice</li>
+    </ol>
+</div>
+
+<div class="main-content app-content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card" id="invoiceCardBody">
+                    <div class="card-body">
+
+                        <!-- Logo Section -->
+                        <div class="text-center mb-3">
+                            <img src="{% static 'images/brand-logos/logo_1.png' %}" alt="logo" width="80" height="80">
+                            <h5 class="mt-2 mb-0 fw-semibold">National Waters</h5>
+                        </div>
+
+                        <!-- Company & Customer Info -->
+                        <div class="row mb-4">
+                            <div class="col-sm-6">
+                                <h5 class="fw-semibold mb-2">Supplier / المورد</h5>
+                                <p class="mb-1 fw-bold">National Waters</p>
+                                <p class="mb-1">Industrial 2, Ajman, UAE</p>
+                                <p class="mb-1">TRN: 100376274500003</p>
+                                <p>Email: info@nationaldrinkingwater.com</p>
+                                <p>Phone: +971 67437961</p>
+                            </div>
+                            <div class="col-sm-6 text-sm-end">
+                                <h5 class="fw-semibold mb-2">Customer / العميل</h5>
+                                <p class="mb-1 fw-bold">{{instance.customer.customer_name}}</p>
+                                <p class="mb-1">{{instance.customer.building_name}}, {{instance.customer.door_house_no}}, {{instance.customer.location}}</p>
+                                <p class="mb-1">Email: {{instance.customer.email_id}}</p>
+                                <p>Phone: {{instance.customer.mobile_no}}</p>
+                            </div>
+                        </div>
+
+                        <!-- Invoice Details -->
+                        <div class="row mb-3">
+                            <div class="col-sm-6">
+                                <p><strong>Invoice No:</strong> #{{instance.invoice_no}}</p>
+                                <p><strong>Date:</strong> {{instance.created_date}}</p>
+                            </div>
+                            <div class="col-sm-6 text-sm-end">
+                                <p><strong>Currency:</strong> AED</p>
+                            </div>
+                        </div>
+
+                        <!-- Items Table -->
+                        <div class="table-responsive border">
+                            <table class="table table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Description</th>
+                                        <th class="text-end">Qty</th>
+                                        <th class="text-end">Unit Price (AED)</th>
+                                        <th class="text-end">Total Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in instance.invoice_items %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>
+                                            {{item.product_items.product_name}}
+                                            <br><small class="text-muted">{{item.category.category_name}}</small>
+                                        </td>
+                                        <td class="text-end">{{item.qty}}</td>
+                                        <td class="text-end">{{item.get_unit_price|floatformat:2}}</td>
+                                        <td class="text-end">{{item.rate|floatformat:2}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Totals -->
+                        <div class="row mt-4">
+                            <div class="col-sm-6">
+                                <p><strong>Amount in Words:</strong> {{instance.get_amount_in_words}}</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr>
+                                        <th class="text-end">Sub Total (Excl. VAT):</th>
+                                        <td class="text-end">{{instance.net_taxable|floatformat:2}}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-end">Discount:</th>
+                                        <td class="text-end">- {{instance.discount|floatformat:2}}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-end">Total (Excl.Tax):</th>
+                                        <td class="text-end">{{instance.items_total_discount_amount|floatformat:2}}</td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-end">VAT ({{instance.vat}}%):</th>
+                                        <td class="text-end">{{instance.get_vat_amount|floatformat:2}}</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <th class="text-end">Total Amount (Incl. VAT):</th>
+                                        <td class="text-end">{{instance.amout_total|floatformat:2}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-4 border-top pt-3">
+                            <p class="mb-0">Thank you for your business! شكراً لتعاملكم معنا</p>
+                        </div>
+
+                        <!-- Print Button -->
+                        <div class="d-print-none mt-4">
+                            <div class="float-end">
+                                <button class="btn btn-success me-1" id="printButton"><i class="fa fa-print"></i> Print</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div><!-- end col -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block static %}
+<script>
+    function printCardBody() {
+        const original = document.body.innerHTML;
+        const content = document.getElementById('invoiceCardBody').innerHTML;
+        document.body.innerHTML = content;
+        window.print();
+        document.body.innerHTML = original;
+    }
+    document.getElementById('printButton').addEventListener('click', printCardBody);
+</script>
+{% endblock static %}

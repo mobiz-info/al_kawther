@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load el_pagination_tags %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between">
+    <h4 class="fw-medium mb-0">Cancelled Customers</h4>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Customer Care</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Cancelled Customers</li>
+    </ol>
+</div>
+<!-- Page Header Close -->
+
+<!-- Start::app-content -->
+<div class="main-content app-content">
+    <div class="container-fluid">
+        <!-- Start:: row -->
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="card custom-card">
+                    <div class="card-header">
+                        <div class="card-title">Cancelled Customers</div>
+                    </div>
+
+                    <div class="card-body">
+                        <table class="table table-bordered text-nowrap" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="text-center">Sl.No</th>
+                                    <th scope="col" class="text-left">Cancelled Date</th>
+                                    <th scope="col" class="text-left">Customer Name</th>
+                                    <th scope="col" class="text-left">Reason</th>
+                                    <th scope="col" class="text-left">Description</th>
+                                    <th scope="col" class="text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% paginate 20 cancelled_customers %}
+                                {% for entry in cancelled_customers %}
+                                <tr id="row-{{ entry.customer_id }}">
+                                    <td class="text-center">{{ forloop.counter }}</td>
+                                    <td class="text-left">{{ entry.created_date|date:"d-m-Y" }}</td>
+                                    <td class="text-left">{{ entry.customer.customer_name }}</td>
+                                    <td class="text-left">{{ entry.reason.reason }}</td>
+                                    <td class="text-left">{{ entry.description }}</td>
+                                    <td class="text-right">
+                                        <a href="{% url 'undo_cancel_customer_confirm' entry.customer.customer_id %}" class="btn btn-warning-light btn-sm" data-bs-toggle="tooltip" data-bs-original-title="Undo Cancellation">
+                                            <span class="bi bi-arrow-counterclockwise fs-14"></span> Undo
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center">No cancelled customers found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% get_pages %}
+                        <div class="clearfix"></div>
+                        <div class="row pagi my-3">
+                            <div class="col-sm-6 col-xs-6 tot my-pagination">
+                                <div class="m-t-10 text-start">
+                                    Showing 
+                                    <span class="current_page_index">{{ pages.current_start_index }}</span> - 
+                                    <span class="current_end_status">{{ pages.current_end_index }}</span> of 
+                                    <span class="total_count">{{ pages.total_count }}</span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 col-xs-6 text-end pagination-btn-div">{% show_pages %}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- End:: row -->
+    </div>
+</div>
+<!-- End::app-content -->
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Missing Customers List{% endblock %}
+{% block content %}
+    <!-- Page Header -->
+    <div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between">
+        <h4 class="fw-medium mb-0">Missing Customers</h4>
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Client Management</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Missing Customer</li>
+        </ol>
+    </div>
+    <!-- Page Header Close -->
+
+    <!-- Start::app-content -->
+    <div class="main-content app-content">
+        <div class="container-fluid">
+            <!-- Start:: row -->
+            <div class="row">
+                <div class="col-xl-12">
+                    <div class="card custom-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card-title">Missing Customers</div>
+                            <!-- Print Button -->
+                            <a href="{% url 'missing_customers_pdf' %}" class="btn btn-outline-success">
+                                <i class="fas fa-print"></i> Print
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-bordered text-nowrap" style="width:100%">
+                                <thead>
+                                    <tr>
+                                        <th style="text-align:center; width:5%;">Sl.No</th>
+                                        <th style="text-align:center;">Route Name</th>
+                                        <th style="text-align:center;">Actual Customers</th>
+                                        <th style="text-align:center;">Planned Customers</th>
+                                        <th style="text-align:center;">Missed Customers</th>
+                                        <th style="text-align:center;">Supplied Customers</th>
+                                        <th style="text-align:center;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for data in route_data %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td style="text-align:left;">{{ data.route_name }}</td>
+                                            <td style="text-align:center;">{{ data.actual_visitors }}</td>
+                                            <td style="text-align:center;">{{ data.planned_visitors }}</td>
+                                            <td style="text-align:center;">{{ data.missed_customers }}</td>
+                                            <td style="text-align:center;">{{ data.supplied_customers }}</td>
+                                            <td style="text-align:center;">
+                                                <a href="{% url 'missed_on_delivery' data.route_id %}" class="btn btn-warning-light btn-sm" aria-label="View" data-bs-toggle="tooltip" data-bs-original-title="View">
+                                                    <span class="bi bi-eye fs-14"></span>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- End:: row -->
+        </div>
+    </div>
+    <!-- End::app-content -->
+{% endblock %}

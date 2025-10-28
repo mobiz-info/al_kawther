@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load van_template_tags %}
+    {% load sales_templatetags %}
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialy Summary Report - Print</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* Custom styles for printing */
+        @media print {
+            /* Hide unnecessary elements */
+            .no-print {
+                display: none !important;
+            }
+            /* Set page margins and other print-specific styles */
+            body {
+                margin: 0;
+                padding: 10px;
+            }
+            .card {
+                border: none !important;
+                box-shadow: none;
+                margin-bottom: 20px;
+            }
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .table-bordered th,
+            .table-bordered td {
+                border: 1px solid #dee2e6;
+            }
+            .card-body{
+                padding: 0px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Start:: row-2 -->
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="card custom-card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            Daily Summary Report
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div>
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-4">
+                                        <p><strong>Salesman: {{van_route.van.salesman.get_fullname}}</strong></p>
+                                    </div>
+                                    <div class="col-4">
+                                        <p><strong>Driver: {{van_route.van.driver.get_fullname}}</strong></p>
+                                    </div>
+                                </div>
+                                <div class="row align-items-center">
+                                    <div class="col-4">
+                                        <p>Route: {{van_route.routes.route_name}}</p>
+                                    </div>
+                                    <div class="col-4">
+                                        <p>Date: {{ filter_date_formatted }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="5">Visit Statistics</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;">New Customer Created</th>
+                                            <th style="text-align:center;">Planned Visit</th>
+                                            <th style="text-align:center;">Visited</th>
+                                            <th style="text-align:center;">Non Visited</th>
+                                            <th style="text-align:center;">Unplanned Visit</th>
+                                            <th style="text-align:center;">Emergency Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="text-align:center;">{{ new_customers_count }}</td>
+                                            <td style="text-align:center;">{{ planned_visit_count }}</td>
+                                            <td style="text-align:center;">{{ visited_customers_count }}</td>
+                                            <td style="text-align:center;">{{ non_visited_count }}</td>
+                                            <td style="text-align:center;">{{ unplanned_count }}</td>
+                                            <td style="text-align:center;">{{ emergency_supply_count }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+    
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="1">ITEM</th>
+                                            <th class="text-center text-bold" colspan="3">STOCK</th>
+                                            <th class="text-center text-bold" colspan="5">SALE</th>
+                                            <th class="text-center text-bold" colspan="6">BOTTLE - EXCESS/SHORT STOCK</th>
+                                            <th class="text-center text-bold" colspan="3">CLOSING</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:left;">Product<br>Name</th>
+                                            <th scope="col" style="text-align:center;">Opening<br>Stock</th>
+                                            <th scope="col" style="text-align:center;">Issued</th>
+                                            <th scope="col" style="text-align:center;">Net Load<br><small>(Opening Stock<br> + Issued)</small></th>
+                                            <th scope="col" style="text-align:center;">Sold Qty<br>(Cash<br> + Cash Custody Issued)</th>
+                                            <th scope="col" style="text-align:center;">Sold Qty<br>(Credit<br> + Credit Custody Issued)</th>
+                                            <th scope="col" style="text-align:center;">Sold Qty<br>(Coupon<br> + Coupon Custody Issued)</th>
+                                            <th scope="col" style="text-align:center;">Sold Qty<br>(FOC)</th>
+                                            <th scope="col" style="text-align:center;">Net Sold<br><small>(Cash + <br>Credit +<br>Coupon +<br>FOC)</small></th>
+                                            <th scope="col" style="text-align:center;">Excess<br><small>(Collected<br>from Customer<br>Outstanding)</small></th>
+                                            <th scope="col" style="text-align:center;">Returned<br><small>(Bottles<br>Collected to<br>Customer<br>Custody)</small></th>
+                                            <th scope="col" style="text-align:center;">Short<br><small>(Added to<br>Customer<br>Outstanding)</small></th>
+                                            <th scope="col" style="text-align:center;">Custody<br>Issued<br><small>(Bottles Added<br>to Customer<br>Custody)</small></th>
+                                            <th scope="col" style="text-align:center;">Damaged<br>Bottle<br><small>(Leak / Service)</small></th>
+                                            <th scope="col" style="text-align:center;">Damaged<br>Bottle<br><small>(Damaged)</small></th>
+                                            <th scope="col" style="text-align:center;">Empty<br>Bottle<br><small>(Final Count<br>of<br>Empty Can)</small></th>
+                                            <th scope="col" style="text-align:center;">Fresh Stock<br><small>(Final Count<br>of<br>Fresh Stock)</small></th>
+                                            <th scope="col" style="text-align:center;">Total Offload<br><small>(Empty Stock<br>Offloaded +<br>Fresh Stock Offloaded)</small></th>
+                                            {% if request.user.is_superuser %}
+                                            <th scope="col" style="text-align:center;">Action</th>
+                                            {% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for van_data in van_product_stock %}
+                                        {% get_van_product_wise_stock filter_data.filter_date van_data.van.pk van_data.product.pk as stock_details %}
+                                        <tr>
+                                            <td style="text-align:left;">{{van_data.product.product_name}}</td>
+                                            <td style="text-align:center;">{{stock_details.opening_stock}}</td>
+                                            <td style="text-align:center;">{{stock_details.issued_count}}</td>
+                                            <td style="text-align:center;">{{stock_details.net_load}}</td>
+    
+                                            <td style="text-align:center;">{{stock_details.cash_sale_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.credit_sale_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.coupon_sale_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.foc_sale_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.net_sales_qty }}</td>
+                                            
+                                            <td style="text-align:center;">{{stock_details.extra_bottles }}</td>
+                                            <td style="text-align:center;">{{stock_details.return_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.missed_bottles }}</td>
+                                            <td style="text-align:center;">{{stock_details.custody_issued_qty }}</td>
+                                            <td style="text-align:center;">{{stock_details.leak_service_bottle_count }}</td>
+                                            <td style="text-align:center;">{{stock_details.damage_bottle_count }}</td>
+    
+                                            <td style="text-align:center;">{{stock_details.empty_stock }}</td>
+                                            <td style="text-align:center;">{{stock_details.fresh_stock }}</td>
+                                            <td style="text-align:center;">{{stock_details.offload_count }}</td>
+    
+                                            {% if request.user.is_superuser %}
+                                            <td>
+                                                <div class="g-2">
+                                                    <a href="{% url 'vanstock_product_update' pk=van_data.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
+                                                        <span class="ri-pencil-line fs-14"></span>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="14">Coupon Stock Report</th>
+                                        </tr>
+                                        {% for van_coupon_data in coupon_items %}
+                                        {% get_van_coupon_name_wise_stock filter_data.filter_date van_instances.pk van_coupon_data.product_name as stock_details %}
+                                        <tr>
+                                            <td style="text-align:left;">{{van_coupon_data.product_name}}</td>
+                                            <td style="text-align:center;">{{stock_details.opening_stock}}</td>
+                                            <td style="text-align:center;">{{stock_details.issued_count}}</td>
+                                            <td style="text-align:center;">{{stock_details.net_load}}</td>
+                                            <td style="text-align:center;">{{stock_details.cash_coupon_reachage_count}}</td>
+                                            <td style="text-align:center;">{{stock_details.credit_coupon_reachage_count}}</td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;">{{stock_details.net_coupon_reachage_count}}</td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;">{{stock_details.return_count}}</td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;">{{stock_details.damage_count}}</td>
+                                            <td style="text-align:center;"> - </td>
+                                            <td style="text-align:center;">{{stock_details.closing_count}}</td>
+                                            <td style="text-align:center;">{{stock_details.offload_count}}</td>
+                                            {% comment %} <td>
+                                                <div class="g-2">
+                                                    <a href="{% url 'vanstock_product_update' pk=van_data.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
+                                                        <span class="ri-pencil-line fs-14"></span>
+                                                    </a>
+                                                </div>
+                                            </td> {% endcomment %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        
+                        {% if pending_bottle_customer_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Pending Bottle</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Sl No</th>
+                                            <th scope="col" style="text-align:center;">Customer Code</th>
+                                            <th scope="col" style="text-align:center;">Customer Name</th>
+                                            <th scope="col" style="text-align:center;">Building Name /Room No</th>
+                                            <th scope="col" style="text-align:center;">Mode Of Supply</th>
+                                            <th scope="col" style="text-align:center;">Qty Supplied</th>
+                                            <th scope="col" style="text-align:center;">Bottles Pending</th>
+                                        </tr>
+                                    </thead>
+                                   <tbody>
+                                        {% for row in pending_bottle_customer_instances %}
+                                        <tr>
+                                            <td>{{ forloop.counter }}</td>
+                                            <td>{{ row.customer.custom_id }}</td>
+                                            <td>{{ row.customer.customer_name }}</td>
+                                            <td>{{ row.customer.building_name }}</td>
+                                            <td style="text-align:center;">{{ row.customer.get_sales_type_display }}</td>                                      
+                                            <td style="text-align:center;">{{ row.get_total_supply_qty }}</td>
+                                            <td style="text-align:center;">{{ row.allocate_bottle_to_pending }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if damage_bottle_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Damage Count</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Sl No</th>
+                                            <th scope="col" style="text-align:center;">Product</th>
+                                            <th scope="col" style="text-align:center;">Quantity</th>
+                                            <th scope="col" style="text-align:center;">Reason</th>
+                                        </tr>
+                                    </thead>
+                                   <tbody>
+                                        {% for row in damage_bottle_instances %}
+                                        <tr>
+                                            <td>{{ forloop.counter }}</td>
+                                            <td>{{ row.product.product_name }}</td>
+                                            <td style="text-align:center;">{{ row.quantity}}</td>
+                                            <td>{{ row.reason.reason }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+    
+                        {% comment %} <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Bottle Count 5 Gallon</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Van Closing Stock</th>
+                                            <th scope="col" style="text-align:center;">Today supplied</th>
+                                            <th scope="col" style="text-align:center;">Custody</th>
+                                            <th scope="col" style="text-align:center;">Pending</th>
+                                            <th scope="col" style="text-align:center;">Damaged</th>
+                                            <th scope="col" style="text-align:center;">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="text-align:center;">{{ closing_stock_count }}</td>
+                                            <td style="text-align:center;">{{ total_supplied_bottles }}</td>
+                                            <td style="text-align:center;">{{ total_empty_bottles }}</td>
+                                            <td style="text-align:center;">{{ pending_bottle_count }}</td>
+                                            <td style="text-align:center;">{{ damage_bottle_count }}</td>
+                                            <td style="text-align:center;">{{ total_count }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div> {% endcomment %}
+    
+                        {% comment %} <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="8">Coupon Book Sales</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;">Sl No</th>
+                                            <th style="text-align:center;">Ref No</th>
+                                            <th>Customer</th>
+                                            <th>Building Name/no</th>
+                                            <th style="text-align:center;">Book No</th>
+                                            <th style="text-align:center;">Coupon Book Type</th>
+                                            <th style="text-align:center;">Coupon Method</th>
+                                            <th style="text-align:center;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for customer_coupon_item in customer_coupon_items %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon_item.customer_coupon.reference_number }}</td>
+                                            <td>{{ customer_coupon_item.customer_coupon.customer.customer_name }}</td>
+                                            <td>{{ customer_coupon_item.customer_coupon.customer.building_name }} /{{ customer_coupon_item.customer_coupon.customer.door_house_no }}/
+                                                {{ customer_coupon_item.customer_coupon.customer.floor_no }}
+                                            </td>
+                                            <td style="text-align:center;">{{ customer_coupon_item.coupon.book_num }}</td>
+                                            <td>{{ customer_coupon_item.coupon.coupon_type.coupon_type_name }}</td>
+                                            <td>{{ customer_coupon_item.coupon.coupon_method }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon_item.rate }}</td>
+    
+                                        </tr>
+                                    {% endfor %} 
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div> {% endcomment %}
+   
+                        {% if customer_coupons %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="8">Coupon Book Sales</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;">Sl No</th>
+                                            <th>Customer Code</th>
+                                            <th>Customer Name</th>
+                                            <th style="text-align:center;">Coupon Details</th>
+    
+                                            <th style="text-align:center;">Total</th>
+                                            <th style="text-align:center;">Discount</th>
+                                            <th style="text-align:center;">Total Payeble</th>
+                                            <th style="text-align:center;">Amount Recieved</th>
+                                            <th style="text-align:center;">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for customer_coupon in customer_coupons %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td>{{ customer_coupon.customer.custom_id }}</td>
+                                            <td>{{ customer_coupon.customer.customer_name }}</td>
+                                            {% comment %} <td>{{ customer_coupon.customer.building_name }} /{{ customer_coupon.customer.door_house_no }}/
+                                                {{ customer_coupon.customer.floor_no }}
+                                            </td> {% endcomment %}
+                                            <td class="p-0">
+                                                <table  class="table table-bordered" style="width: 100%">
+                                                    <tr>
+                                                        <th>Coupon Type</th>
+                                                        <th style="text-align:center;">Book No.</th>
+                                                        <th style="text-align:center;">Method</th>
+                                                        <th style="text-align:center;">Rate</th>
+                                                    </tr>
+                                                    {% get_customer_coupon_details customer_coupon.pk as coupon_items %}
+                                                    {% for item in coupon_items %}
+                                                    <tr>
+                                                        <td>{{ item.coupon.coupon_type.coupon_type_name }}</td>
+                                                        <td style="text-align:center;">{{ item.coupon.book_num }}</td>
+                                                        <td>{{ item.coupon.coupon_method }}</td>
+                                                        <td style="text-align:center;">{{ item.rate }}</td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </table>
+                                            </td>
+                                            <td style="text-align:center;">{{ customer_coupon.grand_total }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon.discount }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon.total_payeble }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon.amount_recieved }}</td>
+                                            <td style="text-align:center;">{{ customer_coupon.balance }}</td>
+                                        </tr>
+                                    {% endfor %} 
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if extra_bottles %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Extra Bottle Collected Customers</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Sl No</th>
+                                            <th scope="col" style="text-align:center;">Customer Code</th>
+                                            <th scope="col" style="text-align:center;">Customer Name</th>
+                                            <th scope="col" style="text-align:center;">Route</th>
+                                            <th scope="col" style="text-align:center;">Supply QTY</th>
+                                            <th scope="col" style="text-align:center;">Collected QTY</th>
+                                        </tr>
+                                    </thead>
+                                   <tbody>
+                                        {% for excess_bottle in extra_bottles %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td>{{ excess_bottle.customer_supply.customer.custom_id }}</td>
+                                            <td>{{ excess_bottle.customer_supply.customer.customer_name }}</td>
+                                            <td style="text-align:center;">{{ excess_bottle.customer_supply.customer.routes.route_name }}</td>                                      
+                                            <td style="text-align:center;">{{ excess_bottle.quantity }}</td>
+                                            <td style="text-align:center;">{{ excess_bottle.customer_supply.collected_empty_bottle }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    {% comment %} <tfoot>
+                                        <tr>
+                                            <td colspan="4" style="text-align:right; font-weight:bold;">Total Quantity</td>
+                                            <td style="text-align:center; font-weight:bold;">{{ total_sum_extra_bottle }}</td>
+                                            <td style="text-align:center; font-weight:bold;">{{ total_extra_bottle_collection }}</td>
+                                        </tr>
+                                    </tfoot> {% endcomment %}
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if missed_bottles %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Short Bottle Collected Customers</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Sl No</th>
+                                            <th scope="col" style="text-align:center;">Customer Code</th>
+                                            <th scope="col" style="text-align:center;">Customer Name</th>
+                                            <th scope="col" style="text-align:center;">Route</th>
+                                            <th scope="col" style="text-align:center;">Supply QTY</th>
+                                            <th scope="col" style="text-align:center;">Collected QTY</th>
+                                        </tr>
+                                    </thead>
+                                   <tbody>
+                                        {% for missed_bottle in missed_bottles %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td>{{ missed_bottle.customer_supply.customer.custom_id }}</td>
+                                            <td>{{ missed_bottle.customer_supply.customer.customer_name }}</td>
+                                            <td style="text-align:center;">{{ missed_bottle.quantity }}</td>
+                                            <td style="text-align:center;">{{ missed_bottle.customer_supply.collected_empty_bottle }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="4" style="text-align:right; font-weight:bold;">Total Quantity</td>
+                                            <td style="text-align:center; font-weight:bold;">{{ total_missed_bottle_qty }}</td>
+                                            <td style="text-align:center; font-weight:bold;">{{ total_missed_bottle_collection }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if five_gallon_cash_sales or recharge_cash_sales or other_cash_sales or fgallon_cash_custody_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <tr>
+                                        <th class="text-center text-bold" colspan="8">Cash Sales</th>
+                                    </tr>
+                                    <tr>
+                                        <th style="text-align:center;">Sl No</th>
+                                        <th style="text-align:left;" scope="col">Customer code</th>
+                                        <th style="text-align:left;" scope="col">Customer Name</th>
+                                        {% comment %} <th style="text-align:center;" scope="col">QTY Sold</th>
+                                        <th style="text-align:center;" scope="col">FOC QTY</th> {% endcomment %}
+                                        <th style="text-align:center;" scope="col">Total QTY</th>
+                                        <th style="text-align:center;" scope="col">Rate</th>
+                                        {% comment %} <th style="text-align:center;" scope="col">Vat</th> {% endcomment %}
+                                        <th style="text-align:center;" scope="col">Grand Total</th>
+                                        <th style="text-align:center;" scope="col">Net Payable</th>
+                                        <th style="text-align:center;" scope="col">Cash Recieved</th>
+                                    </tr>
+                                    {% if five_gallon_cash_sales %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">A. 5 Gallon Sale</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in five_gallon_cash_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.sold_count}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.foc}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_supply_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.subtotal}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.net_payable}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if fgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">B. 5 Gallon Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in fgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.sold_count}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.foc}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_fgallon_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_collected}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if five_gallon_cash_sales or fgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">5 Gallon Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_cash_total_quantity }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_cash_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_cash_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_cash_total_received }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if recharge_cash_sales %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">C. Coupon Recharge</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in recharge_cash_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">1</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.display_coupon_rates}}</td>
+                                        {% comment %} <td style="text-align:center;">0</td> {% endcomment %}
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.grand_total}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.net_amount}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if recharge_cash_sales %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Coupon Recharge Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_sale_recharge_count }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_sale_recharge_grand_total }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_sale_recharge_net_payeble }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_sale_recharge_amount_recieved }}</td>
+                                    </tr> 
+                                    {% endif %}
+                                    {% if other_cash_sales %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">D. Other</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in other_cash_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_supply_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.customer.get_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.subtotal}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.net_payable}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if nonfgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">E. Other Product Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in nonfgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.sold_count}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.foc}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_product_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_collected}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if other_cash_sales or nonfgallon_cash_custody_instances %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Other Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_cash_total_quantity }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_cash_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_cash_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_cash_total_received }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Grand Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_total_qty }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ cash_total_amount_recieved }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        
+                        {% if five_gallon_credit_sales or recharge_credit_sales or other_credit_sales or fgallon_credit_custody_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                            <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <tr>
+                                        <th class="text-center text-bold" colspan="8">Credit Sales</th>
+                                    </tr>
+                                    <tr>
+                                        <th style="text-align:center;">Sl No</th>
+                                        <th style="text-align:left;" scope="col">Customer Code</th>
+                                        <th style="text-align:left;" scope="col">Customer Name</th>
+                                        <th style="text-align:center;" scope="col">Total QTY</th>
+                                        <th style="text-align:center;" scope="col">Rate</th>
+                                        {% comment %} <th style="text-align:center;" scope="col">Vat</th> {% endcomment %}
+                                        <th style="text-align:center;" scope="col">Grand Total</th>
+                                        <th style="text-align:center;" scope="col">Net Payable</th>
+                                        <th style="text-align:center;" scope="col">Cash Recieved</th>
+                                        
+                                    </tr>
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">A. 5 Gallon</td>
+                                    </tr>
+                                    {% for sale in five_gallon_credit_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_supply_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.subtotal}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.net_payable}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if fgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">B. 5 Gallon Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in fgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.sold_count}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.foc}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_fgallon_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_collected}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if five_gallon_credit_sales or fgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">5 Gallon Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_credit_total_quantity }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_credit_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_credit_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ five_gallon_credit_total_received }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if recharge_credit_sales %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center; font-weight: bold;">C. Coupon Recharge</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in recharge_credit_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">1</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.display_coupon_rates}}</td>
+                                        {% comment %} <td style="text-align:center;">0</td> {% endcomment %}
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.grand_total}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.net_amount}}</td>
+                                        <td style="text-align:center;background-color:#ff9a44 !important;">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if recharge_credit_sales %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Coupon Recharge Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ coupon_credit_total_qty }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_sale_recharge_grand_total }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_sale_recharge_net_payeble }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_sale_recharge_amount_recieved }}</td>
+                                    </tr> 
+                                    {% endif %}
+                                    {% if other_credit_sales %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">D. Other</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in other_credit_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_supply_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.subtotal}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.net_payable}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_recieved}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if nonfgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">E. Other Product Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in nonfgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.sold_count}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{van_product_stock.foc}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_product_rate}}</td>
+                                        {% comment %} <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.vat}}</td> {% endcomment %}
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_amount}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.amount_collected}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if other_credit_sales or nonfgallon_credit_custody_instances %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Other Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_credit_total_quantity }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_credit_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_credit_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ other_credit_total_received }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Grand Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_total_qty }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_total_subtotal }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_total_net_taxable }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ credit_total_amount_recieved }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if coupon_sales or fgallon_coupon_custody_instances or nonfgallon_coupon_custody_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <tr>
+                                        <th class="text-center text-bold" colspan="9">Coupon Sales</th>
+                                    </tr>
+                                    <tr>
+                                        <th style="text-align:center;">Sl No</th>
+                                        <th style="text-align:left;" scope="col">Customer Code</th>
+                                        <th style="text-align:left;" scope="col">Customer Name</th>
+                                        <th style="text-align:center;" scope="col">Total QTY</th>
+                                        <th style="text-align:center;" scope="col">AVG<br>Rate</th>
+                                        <th style="text-align:center;" scope="col">Manual<br>Coupon Recieved</th>
+                                        <th style="text-align:center;" scope="col">Digital<br>Coupon Recieved</th>
+                                        <th style="text-align:center;" scope="col">Outstanding<br>Manual Coupons</th>
+                                        <th style="text-align:center;" scope="col">Outstanding<br>Digital Coupons</th>
+                                        
+                                    </tr>
+                                    {% if coupon_sales %}
+                                    <tr>
+                                        <td colspan="9" style="text-align: center;font-weight: bold;">A. 5 Gallon Sale</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in coupon_sales %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_total_supply_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_customer_coupon_rate}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.manual_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.digital_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_manual_coupons}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_digital_coupons}}</td>
+
+                                    </tr>
+                                    {% endfor %}
+                                    {% if fgallon_coupon_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">B. 5 Gallon Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in fgallon_coupon_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_fgallon_rate}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.manual_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.digital_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_manual_coupons}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_digital_coupons}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% if nonfgallon_coupon_custody_instances %}
+                                    <tr>
+                                        <td colspan="8" style="text-align: center;font-weight: bold;">C. Other Custody Issue</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% for sale in nonfgallon_coupon_custody_instances %}
+                                    <tr>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{forloop.counter}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.custom_id}}</td>
+                                        <td style="text-align:left;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}{% if sale.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{sale.customer.customer_name}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}" >{{sale.get_total_custody_qty}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.get_fgallon_rate}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.manual_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.total_coupon_recieved.digital_coupon}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_manual_coupons}}</td>
+                                        <td style="text-align:center;{% if sale.is_edited %}background-color:#c0dfdf !important;{% endif %}">{{sale.outstanding_digital_coupons}}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    <tr>
+                                        <td colspan="3" style="text-align: right;font-weight: bold;">Total:</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ coupon_total_qty }}</td>
+                                        <td style="text-align:center;font-weight: bold;">-</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ manual_coupon_total }}</td>
+                                        <td style="text-align:center;font-weight: bold;">{{ digital_coupon_total }}</td>
+                                        <td style="text-align:center; font-weight: bold;">{{ total_outstandaing_manual_coupons }}</td>
+                                        <td style="text-align:center; font-weight: bold;">{{ total_outstandaing_digital_coupons }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if foc_customers %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">FOC Customers</th>
+                                        </tr>
+                                        <tr>
+                                            <th scope="col" style="text-align:center;">Sl No</th>
+                                            <th scope="col" style="text-align:center;">Customer Code</th>
+                                            <th scope="col" style="text-align:center;">Customer Name</th>
+                                            <th scope="col" style="text-align:center;">Route</th>
+                                            <th scope="col" style="text-align:center;">Quantity</th>
+                                        </tr>
+                                    </thead>
+                                   <tbody>
+                                        {% for foc in foc_customers %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td>{{ foc.customer.custom_id }}</td>
+                                            <td>{{ foc.customer.customer_name }}</td>
+                                            <td style="text-align:center;">{{ foc.customer.routes.route_name }}</td>                                      
+                                            <td style="text-align:center;">
+                                                {% if foc.allocate_bottle_to_free != 0 %}
+                                                {{ foc.allocate_bottle_to_free }}
+                                                {% else %}
+                                                {{ foc.get_total_supply_qty }}
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="4" style="text-align:right; font-weight:bold;">Total Quantity</td>
+                                            <td style="text-align:center; font-weight:bold;">{{ foc_total_quantity }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% comment %} {% if fgallon_custody_instances or nonfgallon_custody_instances %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="10">Custody Issued</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Sl.no</th>
+                                            <th style="text-align:left;" scope="col">Customer Code</th>
+                                            <th style="text-align:left;" scope="col">Customer Name</th>
+                                            <th style="text-align:left;" scope="col">Building Name/Room no</th>
+                                            <th style="text-align:left;" scope="col">Product Name</th>
+                                            <th style="text-align:left;" scope="col">Deposit Type</th>
+                                            <th style="text-align:left;" scope="col">Sale Type</th>
+                                            <th style="text-align:right;" scope="col">Qty</th>
+                                            <th style="text-align:right;" scope="col">Amount</th>
+                                            <th style="text-align:right;" scope="col">Received Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for instance in fgallon_custody_instances %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.custom_id }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.customer_name }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.building_name }} {% if instance.customer.door_house_no %} / {{ instance.customer.door_house_no }} {% endif %}</td>
+                                            <td style="text-align:left;">{{ instance.get_product_name }}</td>
+                                            <td style="text-align:left;">{{ instance.deposit_type }}</td>
+                                            <td style="text-align:left;">{{ instance.get_sales_type_display }}</td>
+                                            <td style="text-align:right;">{{ instance.get_total_custody_qty }}</td>
+                                            <td style="text-align:right;">{{ instance.total_amount }}</td>
+                                            <td style="text-align:right;">{{ instance.amount_collected }}</td>
+                                        </tr>
+                                        {% endfor %} 
+                                        {% for instance in nonfgallon_custody_instances %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.custom_id }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.customer_name }}</td>
+                                            <td style="text-align:left;">{{ instance.customer.building_name }} {% if instance.customer.door_house_no %} / {{ instance.customer.door_house_no }} {% endif %}</td>
+                                            <td style="text-align:left;">{{ instance.product.product_name }}</td>
+                                            <td style="text-align:left;">{{ instance.get_sales_type_display }}</td>
+                                            <td style="text-align:right;">{{ instance.quantity }}</td>
+                                            <td style="text-align:right;">{{ instance.total_amount }}</td>
+                                            <td style="text-align:right;">{{ instance.amount_collected }}</td>
+                                        </tr>
+                                        {% endfor %} 
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="7" style="text-align: right;">Total:</td>
+                                            <td style="text-align:right;">{{total_quantity_from_custody_issue}}</td>
+                                            <td style="text-align:right;">{{total_amount_from_custody_issue}}</td>
+                                            <td style="text-align:right;">{{ collected_amount_from_custody_issue }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+     {% endcomment %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="7">Credit Outstanding</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Credit Outstanding</th>
+                                            <th style="text-align:center;" scope="col">Credit Outstanding Collection</th>
+                                            <th style="text-align:center;" scope="col">Net Outstanding</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="text-align:center;">{{outstanding_credit_notes_total_amount}}</td>
+                                            <td style="text-align:center;">{{outstanding_credit_notes_received_amount}}</td>
+                                            <td style="text-align:center;">{{outstanding_credit_notes_balance}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        {% if outstanding_amounts %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="7">Outstanding Amount</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Customer Code</th>
+                                            <th style="text-align:center;" scope="col">Customer Name</th>
+                                            <th style="text-align:center;" scope="col">Outstanding Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+    
+                                            {% for item in outstanding_amounts %}
+                                            <tr>
+                                                <td style="text-align:center;">{{ item.code }}</td>
+                                                <td style="text-align:center;">{{ item.name }}</td>
+                                                <td style="text-align:center;">{{ item.value }}</td>
+                                            </tr>
+                                            
+                                            {% endfor %}
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if outstanding_cans %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="7">Outstanding Empty Can</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Customer Code</th>
+                                            <th style="text-align:center;" scope="col">Customer Name</th>
+                                            <th style="text-align:center;" scope="col">Outstanding Empty Can</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <tbody>
+                                                {% for item in outstanding_cans %}
+                                                <tr>
+                                                  <td style="text-align:center;">{{ item.code }}</td>
+                                                  <td style="text-align:center;">{{ item.name }}</td>
+                                                  <td style="text-align:center;">{{ item.value }}</td>
+                                                </tr>
+                                                
+                                                {% endfor %}
+                                            </tbody>
+                                              
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if outstanding_coupons %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="7">Outstanding Coupons</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Customer Code</th>
+                                            <th style="text-align:center;" scope="col">Customer Name</th>
+                                            <th style="text-align:center;" scope="col">Outstanding Coupons</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+    
+                                            <tbody>
+                                                {% for item in outstanding_coupons %}
+                                                <tr>
+                                                  <td style="text-align:center;">{{ item.code }}</td>
+                                                  <td style="text-align:center;">{{ item.name }}</td>
+                                                  <td style="text-align:center;">{{ item.value }}</td>
+                                                </tr>
+                                                
+                                                {% endfor %}
+                                            </tbody>
+                                              
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+
+
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="4">5 Gallon Supplied Retes</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Rate</th>
+                                            <th style="text-align:center;" scope="col">Credit</th>
+                                            <th style="text-align:center;" scope="col">Cash</th>
+                                            <th style="text-align:center;" scope="col">Coupon</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rate in five_gallon_rates %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ rate }}</td>
+                                            {% get_five_gallon_ratewise_count rate filter_data.filter_date salesman_id as ratewise_count %}
+                                            <td style="text-align:center;">{{ ratewise_count.credit_amount_count }}</td>
+                                            <td style="text-align:center;">{{ ratewise_count.debit_amount_count }}</td>
+                                            <td style="text-align:center;">{{ ratewise_count.coupon_amount_count }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td style="text-align:right;">Total</td>
+                                            <td style="text-align:center;">{{ total_credit_amount_count }}</td>
+                                            <td style="text-align:center;">{{ total_debit_amount_count }}</td>
+                                            <td style="text-align:center;">{{ total_coupon_amount_count }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        {% if dialy_collections %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="7">Outstanding Amount Collected</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;" scope="col">Sl.no</th>
+                                            <th style="text-align:center;" scope="col">Customer Code</th>
+                                            <th style="text-align:center;" scope="col">Customer Name</th>
+                                            <th style="text-align:center;" scope="col">Building Name/Room no</th>
+                                            <th style="text-align:center;" scope="col">Customer Type</th>
+                                            <th style="text-align:center;" scope="col">Amount Collected</th>
+                                            <th style="text-align:center;" scope="col">Mode</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for instance in dialy_collections %}
+                                        <tr>
+                                            <td style="text-align:center;{% if instance.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{ forloop.counter }}</td>
+                                            <td style="{% if instance.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{ instance.customer.custom_id }}</td>
+                                            <td style="{% if instance.is_repeated_customer %}background-color:#FF0000 !important; color: FFFFFF !important;{% endif %}">{{ instance.customer.customer_name }}</td>
+                                            <td>{{ instance.customer.building_name }} {% if instance.customer.door_house_no %} / {{ instance.customer.door_house_no }} {% endif %}</td>
+                                            <td style="text-align:center;">{{ instance.customer.customer_type }}</td>
+                                            <td style="text-align:center;">{{ instance.amount_received }}</td>
+                                            <td style="text-align:center;">{{ instance.payment_method }}</td>
+                                        </tr>
+                                    {% endfor %} 
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colspan="5" style="text-align: right;">Total:</td>
+                                            
+                                            <td style="text-align:center;">{{ outstanding_total_amount_collected }}</td>
+                                            <td style="text-align:center;"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if expenses_instanses %}
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="3">Expense</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;">Sl No</th>
+                                            <th style="text-align:center;" scope="col">Expense Head</th>
+                                            <th style="text-align:center;" scope="col">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for expense in expenses_instanses %}
+                                        <tr>
+                                            <td style="text-align:center;">{{ forloop.counter }}</td>
+                                            <td>{{ expense.expence_type.name }}</td>
+                                            <td style="text-align:center;">{{ expense.amount }}</td>
+                                        </tr>
+                                        {% endfor %} 
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {% endif %}
+    
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="6">Todays Sales and Collection Related</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <th>Cash Sales Amount Collected</th>
+                                            <td>{{cash_sales_amount_collected}}</td>
+                                            <th>No.of Cheque Collected</th>
+                                            <td>{{no_of_collected_cheque}}</td>
+                                            <th>Cash Sales</th>
+                                            <td>{{total_cash_sales_count}}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Credit Amount Collected</th>
+                                            <td>{{credit_sales_amount_collected}}</td>
+                                            <th>Cheque Amount</th>
+                                            <td>{{collected_cheque_amount}}</td>
+                                            <th>Credit Sales</th>
+                                            <td>{{total_credit_sales_count}}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Custody Issue</th>
+                                            <td>{{collected_amount_from_custody_issue}}</td>
+                                            <th></th>
+                                            <td></td>
+                                            <th>Coupon Sales</th>
+                                            <td>{{total_coupon_sales_count}}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Total Amount Collected</th>
+                                            <td>{{total_sales_amount_collected}}</td>
+                                            <th></th>
+                                            <td></td>
+                                            <th>Total Sales</th>
+                                            <td>{{total_sales_count}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+    
+                        <div id="table-container">
+                            <div class="card-body text-center">
+                                <p><strong>Balance Cash in Hand:</strong>  {{balance_in_hand}}/- </p>
+                                <p><strong>Net Payyable:</strong>  {{net_payble}}/- </p>
+                            </div>
+                        </div>
+    
+                        <div id="table-container">
+                            <div class="card-body">
+                                <table  class="table table-bordered text-wrap" style="width: 100%">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center text-bold" colspan="5">Suspense</th>
+                                        </tr>
+                                        <tr>
+                                            <th style="text-align:center;">Opening</th>
+                                            <th style="text-align:center;">Paid</th> 
+                                            <th style="text-align:center;">Closing</th> 
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td style="text-align:center;">{{ net_payble }}</td>
+                                            <td style="text-align:center;"></td>
+                                            <td style="text-align:center;"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    <div class="card-footer">
+                        <div>
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col d-flex justify-content-between align-items-center">
+                                        <p><strong>Staff Name:</strong></p>
+                                        <p class="px-5"><strong>Acountant: </strong></p>
+                                    </div>
+                                </div>
+                                <div class="row align-items-center">
+                                    <div class="col d-flex justify-content-between align-items-center">
+                                        <p><strong>Date :</strong></p>
+                                        <p class="px-5"><strong>Receipt No: </strong></p>
+                                    </div>
+                                </div>
+                                <div class="row align-items-center">
+                                    <div class="col d-flex justify-content-between align-items-center">
+                                        <p><strong>Signature :</strong></p>
+                                        <p><strong>Office Seal :</strong></p>
+                                        <p class="px-5"><strong>Signature: </strong></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Bootstrap JS (optional) -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+</body>
+</html>

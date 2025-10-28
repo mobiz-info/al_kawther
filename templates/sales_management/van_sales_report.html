@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+{% load van_template_tags %}
+<div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between ">
+    <h4 class="fw-medium mb-0">Van Sales Report</h4>
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Reports</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Van Sales Report</li>
+    </ol>
+</div>
+
+<div class="main-content app-content">
+    <div class="container-fluid">
+        <div class="card custom-card">
+            <div class="card-header">
+                <div class="card-title">Van Sales Report</div>
+            </div>
+
+            <!-- Filters -->
+            <div class="mt">
+                <form method="GET">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col">
+                                <label for="start_date">From Date:</label>
+                                <input type="date" class="form-control" id="start_date" name="from_date" value="{{ filter_data.from_date }}">
+                            </div>
+                            <div class="col">
+                                <label for="end_date">To Date:</label>
+                                <input type="date" class="form-control" id="end_date" name="to_date" value="{{ filter_data.to_date }}">
+                            </div>
+                            <div class="col">
+                                <label for="route_name">Routes:</label>
+                                <select name="route_pk" class="form-select">
+                                    <option value="">All Routes</option>
+                                    {% for route in route_instances %}
+                                        <option value="{{ route.pk }}" {% if route.pk|stringformat:"s" == filter_data.filter_route %}selected{% endif %}>{{ route.route_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col">
+                                <label>Search:</label>
+                                <input type="text" name="q" class="form-control" placeholder="Search ..." value="{{ filter_data.q }}">
+                            </div>
+                            <div class="col d-flex align-items-end justify-content-end">
+                                <input type="submit" class="btn btn-primary btn-sm mx-1" value="Apply Filter">
+                                <button type="button" class="btn btn-secondary btn-sm mx-1" onclick="resetFilters()">Reset Filter</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Table -->
+            <div id="table-container" style="overflow:scroll;">
+                <div class="card-body">
+                    <table  class="table table-bordered text-wrap" style="width: 100%">
+                        <thead>
+                            <tr>
+                                <th>Sl.No</th>
+                                <th>Date</th>
+                                <th>Route</th>
+                                <th>Salesman</th>
+                                <th>1st Load</th>
+                                <th>2nd Load</th>
+
+                                <th>Total Load</th>
+                                <th>WTR RTN</th>
+                                <th>Sale</th>
+                                <th>Empty BTLS RTN</th>
+                                <th>BTLS in Total</th>
+                                <th>BTLS Short</th>
+                                <th>Cancelled BTLS</th>
+                                <th>Custody RTND BTLS</th>
+                                <th>New CUST BTLS</th>
+                                <th>Extra Given BTLS</th>
+                                <th>Leak</th>
+                                <th>Total BTLS In</th>
+                                <th>Actual Next Day Load</th>
+                                <th>Cooler</th>
+                                <th>Mtungi</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% load el_pagination_tags %}
+                            {% paginate 20 instances %}
+                            {% for instance in instances %}
+                            {% get_van_sales_office_report_summary instance.created_date|date:"Y-m-d" instance.van.pk product_pk as stock_details %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ instance.created_date|date }}</td>
+                                <td>{{ instance.van.get_van_route }}</td>
+                                <td>{{ instance.van.salesman.first_name }}</td>
+                                <td class="text-right">{{ stock_details.issued_count }}</td>
+                                <td class="text-right">{{ stock_details.second_load }}</td>
+                                <td class="text-right">{{ stock_details.net_load }}</td>
+                                <td class="text-right">{{ stock_details.wtr_rtrn }}</td>
+                                <td class="text-right">{{ stock_details.net_sales }}</td>
+                                <td class="text-right">{{ stock_details.empty_btls_return }}</td>
+                                <td class="text-right">{{ stock_details.btls_in_total }}</td>
+                                <td class="text-right">{{ stock_details.btls_short }}</td>
+                                <td class="text-right">{{ stock_details.cancelled_btls }}</td>
+                                <td class="text-right">{{ stock_details.extra_given }}</td>
+                                <td class="text-right">{{ stock_details.new_cust }}</td>
+                                <td class="text-right">{{ stock_details.extra_rtn }}</td>
+                                <td class="text-right">{{ stock_details.leak }}</td>
+                                <td class="text-right">{{ stock_details.total_btls_in }}</td>
+                                <td class="text-right">{{ stock_details.next_day_load }}</td>
+                                <td class="text-right">{{ stock_details.cooler }}</td>
+                                <td class="text-right">{{ stock_details.mtungi }}</td>
+                                <td>{{ stock_details.remarks }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% get_pages %}
+            <div class="clearfix"></div>
+            <div class="row pagi my-3">
+                <div class="col-sm-6 col-xs-6 tot my-pagination">
+                    <div class="m-t-10 text-start">
+                        Showing {{title}}
+                        <span class="current_page_index">{{ pages.current_start_index }}</span> - <span
+                        class="current_end_status">{{ pages.current_end_index }}</span> of <span
+                        class="total_count">{{ pages.total_count }}</span>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-xs-6 text-end pagination-btn-div">{% show_pages %}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% comment %} <script>
+function resetFilters() {
+    location.href = "{% url 'van_sales_report' %}";
+}
+</script> {% endcomment %}
+{% endblock %}

@@ -1,0 +1,22 @@
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -15px;
+    margin-right: -15px;
+}
+.col-md-2, .col-md-3, .col-md-4 {
+    padding-left: 15px;
+    padding-right: 15px;
+    margin-bottom: 15px;
+}
+.card {
+    height: 100%;
+}
+.card-body {
+    padding: 20px;
+}
+
+.cardborder{ 
+    border-radius: 15px;
+    border: 1px solid rgb(186, 25, 255);
+}

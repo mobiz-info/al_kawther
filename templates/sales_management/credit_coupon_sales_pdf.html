@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Coupon Sales Report - Print</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        /* Custom styles for printing */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                margin: 0;
+                padding: 10px;
+            }
+            .card {
+                border: none !important;
+                box-shadow: none;
+                margin-bottom: 20px;
+            }
+            .table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .table-bordered th,
+            .table-bordered td {
+                border: 1px solid #dee2e6;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="card custom-card">
+                    <div class="card-header">
+                        <div class="card-title">Credit Coupon Sales Report-{{ route }}</div>
+                    </div>
+                    <div id="table-container">
+                        <div class="card-body">
+                            <table class="table table-bordered text-wrap" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th class="text-center">Sl.No</th>
+                                    <th class="text-center">Customer ID</th>
+                                    <th class="text-center">Customer Name</th>
+                                    <th class="text-center">Book No</th>
+                                    <th class="text-center">Date of Sales</th>
+                                    <th class="text-center">Amount</th>
+                                    <th class="text-center">Received</th>
+                                    <th class="text-center">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in report_data %}
+                                    <tr>
+                                        <td class="text-center">{{ forloop.counter }}</td>
+                                        <td class="text-center">{{ row.customer_id }}</td>
+                                        <td class="text-center">{{ row.customer_name }}</td>
+                                        <td class="text-center">{{ row.book_no }}</td>
+                                        <td class="text-center">{{ row.date_of_sales }}</td>
+                                        <td class="text-right">{{ row.amount|floatformat:2 }}</td>
+                                        <td class="text-right">{{ row.received|floatformat:2 }}</td>
+                                        <td class="text-right">{{ row.balance|floatformat:2 }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center">No data available for selected filter.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="5" class="text-right">Total</th>
+                                    <th class="text-right">{{ total_amount|floatformat:2 }}</th>
+                                    <th class="text-right">{{ total_received|floatformat:2 }}</th>
+                                    <th class="text-right">{{ total_balance|floatformat:2 }}</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS (optional) -->
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        window.onload = function () {
+            window.print();
+        }
+    </script>
+</body>
+</html>
