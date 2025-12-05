@@ -59,8 +59,6 @@
                                     <th>Serial Number</th>
                                     <th>Form No</th>
                                     <th>Quantity</th>
-                                    <th>Amount</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -73,12 +71,6 @@
                                             <td>{{ item.serialnumber }}</td>
                                             <td>{{ custody_item_data.custody_custom.agreement_no }}</td>
                                             <td>{{ item.quantity }}</td>
-                                            <td>{{ item.amount }}</td>
-                                            <td>
-                                                <a href="{% url 'edit_custody_item' item.pk %}" class="btn btn-sm btn-primary">
-                                                    <i class="bi bi-pencil-square"></i> Edit
-                                                </a>
-                                            </td>
                                         </tr>
                                     {% endfor %}
                                 {% endfor %}

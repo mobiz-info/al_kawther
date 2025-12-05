@@ -41,7 +41,219 @@
                     {% endif %}
 
                     <div class="card-body">
-                        <table class="table table-bordered text-nowrap" style="width:100%">
+                        <table class="table table-bordered text-nowrap">
+                            <thead>
+                                <tr class="bg-light">
+                                    <th rowspan="2">Sl.No</th>
+                                    <th rowspan="2">Date</th>
+                                    <th colspan="4">Supply Details</th>
+                                    <th colspan="4">Coupon Details</th>
+                                    <th colspan="2">Outstanding Details</th>
+                                    <th colspan="5">Invoice Details</th>
+                                    <th rowspan="2">Collection</th>
+                                </tr>
+                                {% comment %} <tr>
+                                    <!-- Supply subcolumns -->
+                                    <th>Rate</th>
+                                    <th>Invoice No</th>
+                                    <th>Received</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <!-- Coupon subcolumns -->
+                                    <th>Rate</th>
+                                    <th>Invoice No</th>
+                                    <th>Received</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                    <!-- Outstanding subcolumns -->
+                                    <th>Rate</th>
+                                    <th>Invoice No</th>
+                                    <!-- Invoice subcolumns -->
+                                    <th>Check</th>
+                                    <th>Rate</th>
+                                    <th>Invoice No</th>
+                                    <th>Received</th>
+                                    <th>Balance</th>
+                                    <th>Status</th>
+                                </tr> {% endcomment %}
+                            </thead>
+                            <tbody>
+                                {% reset_totals %}
+                                {% for instance in instances %}
+                                {% get_supply customer instance as supplys %}
+                                {% get_coupon customer instance as coupons %}
+                                {% get_outstanding customer instance as outstanding %}
+                                {% get_invoice customer instance as invoice %}
+                                {% get_collected customer instance as collection %}
+                                <tr>
+                                    <td style="text-align:right;">{{ forloop.counter }}</td>
+                                    <td style="text-align:left;">{{ instance }}</td>
+                                    {% comment %} supplys {% endcomment %}
+                                    <td colspan="4">
+                                        <table class="table table-sm mb-0">
+                                        <tbody>
+                                            {% if supplys %}
+                                            {% for s in supplys %}
+                                            {% if forloop.parentloop.counter == 1 %}
+                                            <tr>
+                                                <th>Rate</th>
+                                                <th>Invoice No</th>
+                                                <th>Received</th>
+                                                <th>Status</th>
+                                            </tr>
+                                            {% endif %}
+                                            <tr>
+                                                <td>AED {{ s.subtotal }}</td>
+                                                <td>{{ s.invoice_no }}</td>
+                                                <td>AED {{ s.amount_recieved }}</td>
+                                                <td>
+                                                {% if s.subtotal == s.amount_recieved %}
+                                                    <span class="badge bg-success">Paid</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">Pending</span>
+                                                {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% add_to_total 'supply' s.subtotal %}
+                                            {% endfor %}
+                                            {% else %}
+                                            <tr><td colspan="5" class="text-muted">No supply records</td></tr>
+                                            {% endif %}
+                                        </tbody>
+                                        </table>
+                                    </td>
+
+                                    {% comment %} coupons {% endcomment %}
+                                    <td colspan="4">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% if coupons %}
+                                                    {% for c in coupons %}
+                                                    {% if forloop.parentloop.counter == 1 %}
+                                                    <tr>
+                                                        <th>Rate</th>
+                                                        <th>Invoice No</th>
+                                                        <th>Received</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                    {% endif %}
+                                                    <tr>
+                                                        <td>{{c.total_payeble}}</td>
+                                                        <td>{{c.invoice_no}}</td>
+                                                        <td>{{c.amount_recieved}}</td>
+                                                        <td>
+                                                            {% if c.total_payeble == c.amount_recieved %} Paid {% else %} Non Paid {% endif %}
+                                                            {% add_to_total 'coupon' c.total_payeble %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                <td colspan="5">-</td>
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </td>
+                                    
+                                    {% comment %} outstanding {% endcomment %}
+                                    <td colspan="2">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% if outstanding %}
+                                                    {% for o in outstanding %}
+                                                    {% if forloop.parentloop.counter == 1 %}
+                                                    <tr>
+                                                        <th>Rate</th>
+                                                        <th>Invoice No</th>
+                                                    </tr>
+                                                    {% endif %}
+                                                    <tr>
+                                                        <td>{{ o.get_outstanding_count }}</td>
+                                                        <td>{{ o.invoice_no }}</td>
+                                                        {% add_to_total 'outstanding' o.get_outstanding_count %}
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                <td colspan="2">-</td>
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </td>
+
+                                    {% comment %} invoices {% endcomment %}
+                                    <td colspan="5">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% if invoice %}
+                                                    {% for i in invoice %}
+                                                    {% if forloop.parentloop.counter == 1 %}
+                                                    <tr>
+                                                        <th>Check</th>
+                                                        <th>Rate</th>
+                                                        <th>Invoice No</th>
+                                                        <th>Received</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                    {% endif %}
+                                                    <tr>
+                                                        <td>
+                                                            {% if request.user.is_superuser %}
+                                                            <input type="checkbox" value="{{i.pk}}" name="invoice_ids" checked>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ i.amout_total }}</td>
+                                                        <td>{{ i.invoice_no }}</td>
+                                                        <td>{{ i.amout_recieved }}</td>
+                                                        <td>
+                                                            {% if i.amout_total == i.amout_recieved %} Paid {% else %} Non Paid {% endif %}
+                                                        </td>
+                                                        {% add_to_total 'invoice_total' i.amout_total %}
+                                                        {% add_to_total 'invoice_received' i.amout_recieved %}
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                <td colspan="6">-</td>
+                                                {% endif %}
+                                            </tbody>                                    
+                                        </table>
+                                    </td>
+
+                                    {% comment %} collection {% endcomment %}
+                                    <td>
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                {% if collection %}
+                                                    {% for i in collection %}
+                                                    <tr>
+                                                        <td>{{ i.amount_received }}</td>
+                                                    </tr>
+                                                    {% add_to_total 'collection' i.amount_received %}
+                                                    {% endfor %}
+                                                {% else %}
+                                                <td>-</td>
+                                                {% endif %}
+                                            </tbody>                                    
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th colspan="6" style="text-align:right;">Grand Total</th>
+                                    <th colspan="4" style="text-align:left;">{% get_total 'coupon' %}</th>
+                                    <th colspan="2" style="text-align:left;">{% get_total 'outstanding' %}</th>
+                                    <th colspan="5" style="text-align:left;">
+                                        Total: {% get_total 'invoice_total' %} - - - Received: {% get_total 'invoice_received' %}
+                                    </th>
+                                    <th style="text-align:left;">{% get_total 'collection' %}</th>
+                                    <input type="hidden" value="{{ customer }}" name="customer_id">
+                                    <input type="hidden" value="{% get_total 'outstanding' %}" name="outstanding_total">
+                                    <input type="hidden" value="{% get_total 'collection' %}" name="collection_total">
+                                </tr>
+                            </tfoot>
+                        </table> 
+                        </table>
+                        {% comment %} <table class="table table-bordered text-nowrap" style="width:100%">
                             <thead>
                                 <tr>
                                     <th style="text-align:center !important;" scope="col">Sl.No</th>
@@ -147,7 +359,7 @@
                                     <input type="hidden" value="{% get_total 'collection' %}" name="collection_total">
                                 </tr>
                             </tfoot>
-                        </table>
+                        </table> {% endcomment %}
                         {% if request.user.is_superuser %}
                         <input type="submit">
                         </form>

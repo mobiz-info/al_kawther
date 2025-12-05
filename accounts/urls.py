@@ -7,7 +7,7 @@ from .views import *
 from accounts import views
 
 urlpatterns = [
-    path("salesman-autocomplete/", SalesmanAutocomplete.as_view(), name="salesman_autocomplete"),
+    path('move-schedule-view',move_schedule_view, name='move_schedule_view'),
     
     path('login',user_login, name='login'),
     path('users', Users_List.as_view(), name='users'),
@@ -30,7 +30,6 @@ urlpatterns = [
     path('visit_days_assign/<str:customer_id>', visit_days_assign, name="visit_days_assign"),
     path('customer_rate_history/<str:pk>/', CustomerRateHistoryListView.as_view(), name='customer_rate_history'),
     re_path(r'^other_product_rate_change/(?P<pk>.*)/$',  OtherProductRateChangeView.as_view(), name='other_product_rate_change'),   
-    path('add-cancel-reason/<uuid:customer_id>/', add_cancel_reason, name='add_cancel_reason'),
     path('customer-username-change/<uuid:customer_id>/', customer_username_change, name='customer_username_change'),
     path('customer-password-change/<uuid:customer_id>/', customer_password_change, name='customer_password_change'),
     
@@ -52,8 +51,4 @@ urlpatterns = [
     path('gps_settings/', Gps_Route_List.as_view(), name='gps_settings'),
     path('gps_active/<uuid:route_id>/', activate_gps_for_route, name='gps_active'),
     path("gps_lock_view/<uuid:route_id>/", gps_lock_view, name="gps_lock_view"),
-
-    path('cancelled_customers', cancelled_customers_list, name='cancelled_customers'),
-    path("undo-cancel-customer/<uuid:customer_id>/", undo_cancel_customer_confirm, name="undo_cancel_customer_confirm"),
-    path("undo-cancel-customer/<uuid:customer_id>/confirm/", undo_cancel_customer, name="undo_cancel_customer"),
 ]

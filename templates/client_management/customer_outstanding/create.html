@@ -41,8 +41,16 @@
                                         {{ customer_outstanding_form.product_type }}
                                         <span style="color: red;">{{ customer_outstanding_form.product_type.errors }}</span>
                                     </div>
-                                </div> 
+                                </div>
+                                <div class="col">
+                                    <div class="form-group required">
+                                        <label class='control-label'>Date</label>
+                                        {{ customer_outstanding_form.created_date }}
+                                        <span style="color: red;">{{ customer_outstanding_form.created_date.errors }}</span>
+                                    </div>
+                                </div>
                             </div>
+                            
                             <div class="row" id="amountForm" style="display: none;">
                                 <div class="row">
                                     <div class="col">

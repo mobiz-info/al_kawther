@@ -1,8 +1,9 @@
-import datetime
+from datetime import timezone
+import random
+from django.db import models,transaction, IntegrityError
 
-from django.db import models
+from django.db.models import Sum,DecimalField,Max
 from django.utils import timezone
-from django.db.models import Sum,DecimalField
 from django.core.exceptions import ObjectDoesNotExist
 
 from accounts.models import Customers, CustomUser
@@ -150,14 +151,15 @@ class CollectionPayment(models.Model):
     PAYMENT_TYPE_CHOICES = (
         ('CASH', 'CASH'),
         ('CHEQUE', 'CHEQUE'),
-        ('CARD', 'CARD')
+        ('CARD', 'CARD'),
+        ('ONLINE', 'ONLINE') 
     )
     payment_method = models.CharField(max_length=100, choices=PAYMENT_TYPE_CHOICES, null=True, blank=True)
     customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
     salesman = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     amount_received = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     receipt_number = models.CharField(max_length=100, unique=True, null=True, blank=True)
-    created_date = models.DateTimeField(auto_now_add=True)
+    created_date = models.DateTimeField(default=timezone.now)
     
     class Meta:
         ordering = ('-id',)
@@ -237,6 +239,27 @@ class CollectionCheque(models.Model):
 
     def _str_(self):
         return f"{self.bank_name} - {self.cheque_no} ({self.status})"
+    
+    
+class CollectionOnline(models.Model):
+    collection_payment = models.OneToOneField(CollectionPayment, on_delete=models.CASCADE)
+    transaction_no = models.CharField(max_length=255, null=True, blank=True)
+    transaction_date = models.DateField(null=True, blank=True)
+    online_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    STATUS_CHOICES = [
+        ('PENDING', 'PENDING'),
+        ('SUCCESS', 'SUCCESS'),
+        ('FAILED', 'FAILED')
+    ]
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDING')
+
+    class Meta:
+        ordering = ('-id',)
+
+    def __str__(self):
+        return f"{self.transaction_no} ({self.status})"
+    
 class CollectionCard(models.Model):
     collection_payment = models.OneToOneField(CollectionPayment, on_delete=models.CASCADE)
     customer_name = models.CharField(max_length=500, null=True, blank=True)
@@ -277,11 +300,11 @@ class Receipt(models.Model):
     transaction_type = models.CharField(max_length=100, choices=TRANSACTION_TYPE_CHOICES, null=True, blank=True)
     instance_id = models.CharField(max_length=200)
     amount_received = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-    receipt_number = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    receipt_number = models.CharField(max_length=100, null=True, blank=True)
     invoice_number = models.CharField(max_length=500) 
     customer = models.ForeignKey('accounts.Customers', on_delete=models.CASCADE)
     
-    created_date = models.DateTimeField(auto_now_add=True)
+    created_date = models.DateTimeField()
     
     class Meta:
         ordering = ('-instance_id',)
@@ -292,31 +315,20 @@ class Receipt(models.Model):
     def save(self, *args, **kwargs):
         if not self.created_date:
             self.created_date = timezone.now() 
-
+        
         if not self.receipt_number:
             year = self.created_date.strftime("%y")
             prefix = f"RV-{year}/"
 
-            last_receipt = Receipt.objects.filter(
+            receipt_count = Receipt.objects.filter(
                 created_date__year=self.created_date.year,
-                receipt_number__startswith=prefix
-            ).order_by('-id').first()
+                receipt_number__startswith=prefix,
+            ).count()
 
-            if last_receipt and last_receipt.receipt_number:
-                try:
-                    last_number = int(last_receipt.receipt_number.split('/')[-1])
-                except:
-                    last_number = 0
-            else:
-                last_number = 0
-
-            self.receipt_number = f"{prefix}{last_number + 1}"
+            new_number = receipt_count + 1
+            self.receipt_number = f"{prefix}{new_number}"
 
         super().save(*args, **kwargs)
-
-
-
-
 
 
 

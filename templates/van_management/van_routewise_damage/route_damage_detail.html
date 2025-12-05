@@ -70,7 +70,7 @@
                             <input type="text" name="q" class="form-control" placeholder="Search ..." value="{{ filter_data.q }}">
                         </div>
                         <div class="col d-flex align-items-end justify-content-end">
-                            <button type="submit" class="btn btn-primary btn-sm mx-1">Apply Filter</button>
+                            <button type="submit" class="btn btn-primary btn-sm mx-1">Apply </button>
                             <button type="button" class="btn btn-secondary btn-sm mx-1" onclick="resetFilters()">Reset</button>
                             <a href="{% url 'route_damage_detail_print' route.route_id %}?start_date={{ request.GET.start_date }}&end_date={{ request.GET.end_date }}&product_name={{ request.GET.product_name }}&van_name={{ request.GET.van_name }}&reason={{ request.GET.reason }}&q={{ request.GET.q }}"
                                 class="btn btn-outline-success btn-sm mx-1" 
@@ -101,6 +101,7 @@
                                 <th>Product Name</th>
                                 <th>Reason</th>
                                 <th>Total Quantity</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -113,6 +114,16 @@
                                 <td>{{ record.product__product_name }}</td>
                                 <td>{{ record.reason__reason }}</td>
                                 <td>{{ record.total_quantity }}</td>
+                                <td>
+                                    <div class="g-2">
+                                        <a href="{% url 'edit_van_sale_damage' record.id %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
+                                            <span class="ri-pencil-line fs-14"></span>
+                                        </a>
+                                        <a aria-label="anchor" class="action-button remove btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete"
+                                            data-id="{{record.id}}" data-text="{{confirm_delete_message}}" data-title="Are you sure?" href="{% url 'delete_van_sale_damage' pk=record.id %}"><span class="ri-delete-bin-7-line fs-14"></span>
+                                        </a>
+                                    </div>
+                                </td>
                             </tr>
                             {% empty %}
                             <tr>
@@ -124,6 +135,7 @@
                             <tr>
                                 <td colspan="5" class="text-end fw-bold">Grand Total:</td>
                                 <td class="fw-bold">{{ grand_total_quantity }}</td>
+                                <td colspan="1" class="text-center"></td>
                             </tr>
                         </tfoot>
                     </table>

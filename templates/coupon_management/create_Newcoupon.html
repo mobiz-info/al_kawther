@@ -157,62 +157,57 @@
     });
     
     function generateLeafletList(startLeaf, endLeaf, listElement, textareaId) {
-        // Allow letters + optional dash (or more symbols if needed)
-        const startMatch = startLeaf.match(/^([a-zA-Z-]*)(\d+)$/);
-        const endMatch = endLeaf.match(/^([a-zA-Z-]*)(\d+)$/);
-
+        const startMatch = startLeaf.match(/([a-zA-Z]*)(\d+)/);
+        const endMatch = endLeaf.match(/([a-zA-Z]*)(\d+)/);
+    
         if (!startMatch || !endMatch) {
-            document.getElementById('error-message').textContent = 
-                'Invalid leaf number format (e.g., J-001, WE100).';
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = 'Invalid leaf number format.';
             return;
         }
-
-        const startPrefix = startMatch[1];  // <-- dynamic prefix (J-, WE, etc.)
+    
+        const startPrefix = startMatch[1];
         const startNum = parseInt(startMatch[2], 10);
-        const startLength = startMatch[2].length;
-
+        const startLength = startMatch[2].length; // Length of the numeric part
         const endPrefix = endMatch[1];
         const endNum = parseInt(endMatch[2], 10);
-
+    
         if (startPrefix !== endPrefix) {
-            document.getElementById('error-message').textContent =
-                'Prefixes of starting and ending leaf numbers must match.';
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = 'Prefixes of starting and ending leaf numbers must match.';
             return;
         }
-
+    
         if (startNum > endNum) {
-            document.getElementById('error-message').textContent =
-                'Starting leaf number cannot be greater than ending leaf number.';
+            const errorMessage = document.getElementById('error-message');
+            errorMessage.textContent = 'Starting leaf number cannot be greater than ending leaf number.';
             return;
         }
-
+    
         const textareaElement = document.getElementById(textareaId);
+    
+        // Clear previous content
         textareaElement.value = '';
-
+    
         let leafletList = [];
-
+    
         for (let i = startNum; i <= endNum; i++) {
-            const paddedNum = i.toString().padStart(startLength, '0');
+            const paddedNum = i.toString().padStart(startLength, '0'); // Ensure the number matches the original length
             const fullLeafNumber = startPrefix + paddedNum;
-
+    
             const listItem = document.createElement('li');
             listItem.textContent = fullLeafNumber;
             listItem.classList.add("generated_leaf_li");
             listElement.appendChild(listItem);
-
+    
+            // Add to the list
             leafletList.push(fullLeafNumber);
         }
-
-        // Save numbers list
+    
+        // Convert the list to a string with commas separating the values
         textareaElement.value = leafletList.join(', ');
-
-        // Save/display prefix separately if needed
-        const prefixElement = document.getElementById(textareaId + "_prefix");
-        if (prefixElement) {
-            prefixElement.value = startPrefix;
-        }
     }
-
+       
 </script>
 <script>
     $('#id_coupon_type').change(function () {

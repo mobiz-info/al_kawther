@@ -4,8 +4,6 @@ from .views import *
 
 
 urlpatterns = [
-    path("coupon-autocomplete/", CouponAutocomplete.as_view(), name="coupon_autocomplete"),
-    
     path('couponType',couponType, name='couponType'),
     path('create_couponType/',create_couponType, name='create_couponType'),
     path('view_couponType/<uuid:coupon_type_id>/', view_couponType, name="view_couponType"),
@@ -32,15 +30,14 @@ urlpatterns = [
     path('generate_excel/', generate_excel, name='generate_excel'),
     path('customer_stock_pdf/', customer_stock_pdf, name='customer_stock_pdf'),
 
-    path('redeemed_history/', redeemed_history, name='redeemed_history'),
+    path('redeemed_historyy/', redeemed_history, name='redeemed_historyy'),
     path('redeemed-coupon-details/<uuid:supply_pk>/', redeemed_coupon_details, name='redeemed_coupon_details'),
     path('print_redeemed_history/', print_redeemed_history, name='print_redeemed_history'),
     path('coupon_recharge/', coupon_recharge_list, name='coupon_recharge'),
     path("edit_coupon_recharge/<uuid:pk>/", edit_coupon_recharge, name="edit_coupon_recharge"),
     path("delete_coupon_recharge/<uuid:pk>/", delete_coupon_recharge, name="delete_coupon_recharge"),
 
-    path('un-issued-coupon-books/', un_issued_coupon_book_list, name='un_issued_coupon_book_list'),
-    path('reassign-unissued-coupon/<uuid:pk>/', reassign_unissued_coupon, name='reassign_unissued_coupon'),
+
 
 
  ]

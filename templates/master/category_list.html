@@ -57,14 +57,9 @@
                                                     <a href="{% url 'category_edit' data.category_id %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
                                                         <span class="ri-pencil-line fs-14"></span>
                                                     </a>
-                                                    <form action="{% url 'category_delete' data.category_id %}" method="post" style="display:inline;">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" 
-                                                            data-bs-original-title="Delete"
-                                                            onclick="return confirm('Are you sure you want to delete this category?');">
-                                                            <span class="ri-delete-bin-7-line fs-14"></span>
-                                                        </button>
-                                                    </form>
+                                                    <a aria-label="anchor" class="btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete">
+                                                        <span class="ri-delete-bin-7-line fs-14"></span>
+                                                    </a>
                                             </div>
                                             </td>
                                         </tr>

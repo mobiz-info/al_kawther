@@ -8,10 +8,10 @@
     <meta charset="UTF-8">
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Al Kawthar Pure Drinking Water</title>
-    <meta name="Description" content="Al Kawthar Pure Drinking Water admin dashboard">
+    <title>Sana Water</title>
+    <meta name="Description" content="Sana water admin dashboard">
     <meta name="Author" content="Mobiz Technologies">
-	<meta name="keywords" cNational nt="Al Kawthar Pure Drinking Water admin dashboard">
+	<meta name="keywords" content="Sana water admin dashboard">
 
     <!-- Favicon -->
     <link rel="icon" href="{%static 'images/brand-logos/desktop-logos.png'%}" type="image/x-icon">
@@ -46,7 +46,7 @@
     <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.3.0/css/responsive.bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.3/css/buttons.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
 
     <style>
         .my-pagina{
@@ -70,15 +70,6 @@
             background-color: rgb(142, 84, 233);
         }
     </style>
-    <style>
-        .vertical-text {
-          writing-mode: vertical-rl !important;
-          transform: rotate(180deg) !important;
-          white-space: nowrap !important;
-          vertical-align: bottom !important;
-          height: 150px !important;
-        }
-      </style>
 </head>
 
 <body>
@@ -1207,21 +1198,22 @@
                                     <a href="{% url 'scrap_clearance_report' %}" class="side-menu__item">Scrap Clearence Report</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'route_wise_bottle_count' %}" class="side-menu__item">Route Wise Bottle Count Report</a>
+                                    <a href="{% url 'freelance_van_issue_report' %}" class="side-menu__item">Freelance Van Issue Report</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'pullout_report' %}" class="side-menu__item">Pullout Report</a>
+                                    <a href="{% url 'audit_report' %}" class="side-menu__item">Audit Report</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'credit_coupon_sales_report' %}" class="side-menu__item">Credit Coupon Sales Report</a>
+                                    <a href="{% url 'customer_outstanding_report' %}" class="side-menu__item">Outstanding Variation Report</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'manual_coupon_detail' %}" class="side-menu__item">Manually Sold Coupon Leaflets </a>
+                                    <a href="{% url 'custody_custom_list' %}" class="side-menu__item">Custody Custom Report</a>
                                 </li>
+
                             </ul>
                         </li>
-                        
-                         <li class="slide__category"><span class="category-name">Van Management</span></li>
+
+                        <li class="slide__category"><span class="category-name">Van Management</span></li>
                         <!-- End::slide__category -->
 
                         <!-- Start::slide -->
@@ -1239,6 +1231,9 @@
                                 </li>
                                 <li class="slide">
                                     <a href="{% url 'van' %}" class="side-menu__item">Van</a>
+                                </li>
+                                <li class="slide">
+                                    <a href="{% url 'freelancevan' %}" class="side-menu__item">Freelance Van</a>
                                 </li>
                                 <li class="slide">
                                     <a href="{% url 'licence_list' %}" class="side-menu__item">Municipality License</a>
@@ -1280,9 +1275,7 @@
                                 <li class="slide">
                                     <a href="{% url 'salesman_customer_request_type_list' %}" class="side-menu__item">Salesman Customer Request</a>
                                 </li> 
-                                <li class="slide">
-                                    <a href="{% url 'audit_report' %}" class="side-menu__item">Audit Report</a>
-                                </li>  
+                                  
                             </ul>
                         </li>
                         <li class="slide__category"><span class="category-name">Product Management</span></li>
@@ -1373,9 +1366,6 @@
                                     <a href="{% url 'customer_supply_list' %}" class="side-menu__item">Supply</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'custody_approvals_list' %}" class="side-menu__item">Custody Approvals</a>
-                                </li>
-                                <li class="slide">
                                     <a href="{% url 'client_report' %}" class="side-menu__item">Client Report</a>
                                 </li>
                                                                 <li class="slide">
@@ -1390,9 +1380,12 @@
                                 <li class="slide">
                                     <a href="{% url 'customer_outstanding_list' %}" class="side-menu__item">Outstanding</a>
                                 </li>
-                                {% comment %} <li class="slide">
+                                <li class="slide">
                                     <a href="{% url 'outstanding_list' %}" class="side-menu__item">Customer Outstanding</a>
-                                </li> {% endcomment %}
+                                </li>
+                                <li class="slide">
+                                    <a href="{% url 'bottle_count' %}" class="side-menu__item">Bottle count</a>
+                                </li>
                                 <li class="slide">
                                     <a href="{% url 'customer_orders_list' %}" class="side-menu__item">Customer Orders</a>
                                 </li>
@@ -1408,8 +1401,9 @@
                                 <li class="slide">
                                     <a href="{% url 'eligible_customers' %}" class="side-menu__item">Eligible Customers</a>
                                 </li>
-                                
-                                
+                                <li class="slide">
+                                    <a href="{% url 'customer_custody_stock' %}" class="side-menu__item">Custody Stock</a>
+                                </li>
                             </ul>
                         </li>
                         <li class="slide__category"><span class="category-name">Coupon Management</span></li>
@@ -1438,13 +1432,10 @@
                                     <a href="{% url 'customer_stock' %}" class="side-menu__item">Customer Stock</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'redeemed_history' %}" class="side-menu__item">Redeemed History</a>
+                                    <a href="{% url 'redeemed_historyy' %}" class="side-menu__item">Redeemed History</a>
                                 </li>
                                 <li class="slide">
                                     <a href="{% url 'coupon_recharge' %}" class="side-menu__item">Coupon Recharge</a>
-                                </li>
-                                <li class="slide">
-                                    <a href="{% url 'un_issued_coupon_book_list' %}" class="side-menu__item">Un Issued Coupons</a>
                                 </li>
                             </ul>
                         </li>
@@ -1466,7 +1457,7 @@
                                     <a href="{% url 'requesttype_list' %}" class="side-menu__item">Request Type</a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'requestType' %}" class="side-menu__item">Add Emergency Request</a>
+                                    <a href="{% url 'requestType' %}" class="side-menu__item">Add Emergency Customer</a>
                                 </li>
                                 <li class="slide">
                                     <a href="{% url 'new_customer_request' %}" class="side-menu__item">New Request</a>
@@ -1480,12 +1471,8 @@
                                 <li class="slide">
                                     <a href="{% url 'customer_request_type_list' %}" class="side-menu__item">Customer Request Type</a>
                                 </li>
-
                                 <li class="slide">
-                                    <a href="{% url 'cancel_reasons' %}" class="side-menu__item">Cancel Reasons</a>
-                                </li>
-                                <li class="slide">
-                                    <a href="{% url 'cancelled_customers' %}" class="side-menu__item">Cancelled Customers</a>
+                                    <a href="{% url 'guest_customers' %}" class="side-menu__item">Guest Customer</a>
                                 </li>
 
                                 <!-- <li class="slide">
@@ -1508,21 +1495,19 @@
                                     <a href="javascript:void(0)"></a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'van_route_bottle_count' %}" class="side-menu__item">Daily Transaction Summary</a>
-                                </li>
-                                <li class="slide">
-                                    <a href="{% url 'bottle_count' %}" class="side-menu__item">Bottle count</a>
-                                </li>
+                                    <a href="{% url 'van_route_bottle_count' %}" class="side-menu__item">Bottle Count</a>
+                                </li>                                                           
                                 
                             </ul>
                         </li>
-                        <li class="slide__category"><span class="category-name">Store Management</span></li>
+
+                        <li class="slide__category"><span class="category-name">Audit Management</span></li>
                         <li class="slide has-sub">
                             <a href="javascript:void(0);" class="side-menu__item">
                                 <span class=" side-menu__icon">
                                     <i class='bx bx-desktop'></i>
                                 </span>
-                                <span class="side-menu__label">Store Management<span class="badge bg-warning-transparent ms-2 d-inline-block">1</span></span>
+                                <span class="side-menu__label">Audit Management<span class="badge bg-warning-transparent ms-2 d-inline-block">2</span></span>
                                 <i class="fe fe-chevron-right side-menu__angle"></i>
                             </a>
                             <ul class="slide-menu child1">
@@ -1530,9 +1515,8 @@
                                     <a href="javascript:void(0)"></a>
                                 </li>
                                 <li class="slide">
-                                    <a href="{% url 'van_sales_report' %}" class="side-menu__item">Van Sales Report</a>
-                                </li>
-                               
+                                    <a href="{% url 'select_executive' %}" class="side-menu__item">Audit</a>
+                                </li>                                                           
                                 
                             </ul>
                         </li>
@@ -1637,12 +1621,12 @@
                         </span>
                         <span class="side-menu__label">Privacy Policy</span>
                     </a>
-                    <a href="{% url 'terms_and_conditions_list' %}" class="side-menu__item">
-                        <span class=" side-menu__icon">
-                            <i class='bx bx-desktop'></i>
+                    {% comment %} <a href="{% url 'permission_management_tab_list' %}" class="side-menu__item">
+                        <span class="side-menu__icon">
+                            <i class='bx bx-lock-alt'></i>  <!-- Lock icon for permissions -->
                         </span>
-                        <span class="side-menu__label">Terms and Conditions</span>
-                    </a>
+                        <span class="side-menu__label">Permission Management</span>
+                    </a> {% endcomment %}
                     <a href="{% url 'processing_log' %}" class="side-menu__item">
                         <span class=" side-menu__icon">
                             <i class='bx bx-desktop'></i>
@@ -1729,7 +1713,7 @@
        <footer class="footer mt-auto py-3 bg-white text-center">
            <div class="container">
                <span class="text-muted"> Copyright © <span id="year"></span> <a
-                       href="javascript:void(0);" class="text-dark bold">Al Kawthar Pure Drinking Water</a>.
+                       href="javascript:void(0);" class="text-dark fSanamibold">Sana Waters</a>.
                    powered by <a href="https://www.mobiztechnologies.com/">
                        <span class="fw-semibold text-primary text-decoration-underline">Mobiz Technologies</span>
                    </a> All

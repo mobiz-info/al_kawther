@@ -94,6 +94,7 @@ urlpatterns = [
     path('staff_assigned_routes/',Route_Assign_Staff_Api.as_view(), name='staff_assigned_routes'),
     path('create/customer/',Customer_API.as_view()),
     path('create/customer/<str:id>/',Customer_API.as_view()),
+    path('get_items_api/',Get_Items_API.as_view()),
     path('get_items_api/<str:id>/',Get_Items_API.as_view()),
     path('add_custody_item/',Add_Customer_Custody_Item_API.as_view()),
     path('add_custody_item/<str:id>/',Add_Customer_Custody_Item_API.as_view()),
@@ -107,6 +108,7 @@ urlpatterns = [
     path('edit-customer-supply/<uuid:pk>/', edit_customer_supply.as_view()),
     # path('delete-customer-supply/<uuid:pk>/', delete_customer_supply.as_view()),
     re_path(r'^customer-outstanding/$', customer_outstanding.as_view()),
+    # path('create-customer-supply-latest/', create_customer_supply_latest),
    
     ################### COUPON MANAGEMENT URL ######################
     path('couponType/',CouponType_API.as_view()),
@@ -350,6 +352,7 @@ urlpatterns = [
     path('update-customer-request-status/', UpdateCustomerRequestStatusView.as_view(), name='update-customer-request-status'),
     path('all-customer-requests-lists/', AllCustomerRequestListAPIView.as_view(), name='all-customer-requests-lists'),
 
+
     path('salesman-customer-request-types/', SalesmanCustomerRequestTypeAPIView.as_view()),
     path('salesman-customer-requests/', SalesmanCustomerRequestCreateAPIView.as_view()),
     path('salesman-customer-requests-lists/', SalesmanCustomerRequestListAPIView.as_view()),
@@ -377,7 +380,5 @@ urlpatterns = [
     
     
     path('reprint-invoices/', ReprintInvoicesAPIView.as_view(), name='reprint-invoices'),
-    
-    
-    
-]   
+
+]

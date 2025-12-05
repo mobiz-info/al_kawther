@@ -31,7 +31,7 @@ class Command(BaseCommand):
             )
             
             if supply.customer.sales_type == "CREDIT":
-                invoice.invoice_type = "credit_invoive"
+                invoice.invoice_type = "credit_invoice"
             if invoice.amout_total == invoice.amout_recieved:
                 invoice.invoice_status = "paid"
             invoice.save()
@@ -66,9 +66,9 @@ class Command(BaseCommand):
                 transaction_type="supply",
                 instance_id=str(supply.id),  
                 amount_received=supply.amount_recieved,
-                # receipt_number=generate_receipt_no(supply.created_date.date()),
                 customer=supply.customer,
-                invoice_number=",".join(invoice_numbers)
+                invoice_number=",".join(invoice_numbers),
+                created_date=invoice.created_date
             )
             
             self.stdout.write(self.style.SUCCESS(f'Successfully updated {supply.invoice_no}'))

@@ -108,27 +108,24 @@
     $(document).ready(function(){
         $("#id_product_type").change(function(){
             var productType = $(this).val();
-    
             if (productType == "amount"){
-                $("#amountForm").show();   
-            } else {
+             $("#amountForm").show();   
+            }else{
                 $("#amountForm").hide();   
             }
-    
+
             if (productType == "emptycan"){
                 $("#emptyBottleForm").show();   
-            } else {
-                $("#emptyBottleForm").hide();   
+            }else{
+                   $("#emptyBottleForm").hide();   
             }
-    
+
             if (productType == "coupons"){
                 $("#emptyCouponForm").show();   
-            } else {
-                $("#emptyCouponForm").hide();   
+            }else{
+                   $("#emptyCouponForm").hide();   
             }
         });
-    
-        $("#id_product_type").trigger('change');
     });
 </script>
 {% endblock static %}

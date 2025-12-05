@@ -110,7 +110,7 @@ def get_customer_outstanding_aging(route=None):
         return []
 
     aging_report = []
-    current_date = timezone.now().date()
+    current_date = datetime.datetime.now().date()
 
     # Step 1: Get outstanding amounts for customers in the given route
     outstanding_data = OutstandingAmount.objects.filter(
@@ -123,7 +123,7 @@ def get_customer_outstanding_aging(route=None):
         less_than_30=Sum(
             Case(
                 When(
-                    customer_outstanding__created_date__gte=current_date - timezone.timedelta(days=30),
+                    customer_outstanding__created_date__gt=current_date - timezone.timedelta(days=30),
                     then='amount'
                 ),
                 default=0,
@@ -133,7 +133,7 @@ def get_customer_outstanding_aging(route=None):
         between_31_and_60=Sum(
             Case(
                 When(
-                    customer_outstanding__created_date__gte=current_date - timezone.timedelta(days=60),
+                    customer_outstanding__created_date__gt=current_date - timezone.timedelta(days=60),
                     customer_outstanding__created_date__lt=current_date - timezone.timedelta(days=30),
                     then='amount'
                 ),
@@ -144,7 +144,7 @@ def get_customer_outstanding_aging(route=None):
         between_61_and_90=Sum(
             Case(
                 When(
-                    customer_outstanding__created_date__gte=current_date - timezone.timedelta(days=90),
+                    customer_outstanding__created_date__gt=current_date - timezone.timedelta(days=90),
                     customer_outstanding__created_date__lt=current_date - timezone.timedelta(days=60),
                     then='amount'
                 ),
@@ -155,7 +155,7 @@ def get_customer_outstanding_aging(route=None):
         between_91_and_150=Sum(
             Case(
                 When(
-                    customer_outstanding__created_date__gte=current_date - timezone.timedelta(days=150),
+                    customer_outstanding__created_date__gt=current_date - timezone.timedelta(days=150),
                     customer_outstanding__created_date__lt=current_date - timezone.timedelta(days=90),
                     then='amount'
                 ),
@@ -166,7 +166,7 @@ def get_customer_outstanding_aging(route=None):
         between_151_and_365=Sum(
             Case(
                 When(
-                    customer_outstanding__created_date__gte=current_date - timezone.timedelta(days=365),
+                    customer_outstanding__created_date__gt=current_date - timezone.timedelta(days=365),
                     customer_outstanding__created_date__lt=current_date - timezone.timedelta(days=150),
                     then='amount'
                 ),
@@ -194,28 +194,27 @@ def get_customer_outstanding_aging(route=None):
         collected = {
             'less_than_30': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
-                created_date__date__gte=current_date - timezone.timedelta(days=30),
-                created_date__date__lte=current_date
+                created_date__date__gt=current_date - timezone.timedelta(days=30),
             ).aggregate(total_collected=Sum('amount_received'))['total_collected'] or 0,
             'between_31_and_60': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
-                created_date__date__gte=current_date - timezone.timedelta(days=60),
-                created_date__date__lte=current_date - timezone.timedelta(days=30)
+                created_date__date__gt=current_date - timezone.timedelta(days=60),
+                created_date__date__lt=current_date - timezone.timedelta(days=30)
             ).aggregate(total_collected=Sum('amount_received'))['total_collected'] or 0,
             'between_61_and_90': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
-                created_date__date__gte=current_date - timezone.timedelta(days=90),
-                created_date__date__lte=current_date - timezone.timedelta(days=60)
+                created_date__date__gt=current_date - timezone.timedelta(days=90),
+                created_date__date__lt=current_date - timezone.timedelta(days=60)
             ).aggregate(total_collected=Sum('amount_received'))['total_collected'] or 0,
             'between_91_and_150': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
-                created_date__date__gte=current_date - timezone.timedelta(days=150),
-                created_date__date__lte=current_date - timezone.timedelta(days=90)
+                created_date__date__gt=current_date - timezone.timedelta(days=150),
+                created_date__date__lt=current_date - timezone.timedelta(days=90)
             ).aggregate(total_collected=Sum('amount_received'))['total_collected'] or 0,
             'between_151_and_365': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
-                created_date__date__gte=current_date - timezone.timedelta(days=365),
-                created_date__date__lte=current_date - timezone.timedelta(days=150)
+                created_date__date__gt=current_date - timezone.timedelta(days=365),
+                created_date__date__lt=current_date - timezone.timedelta(days=150)
             ).aggregate(total_collected=Sum('amount_received'))['total_collected'] or 0,
             'more_than_365': CollectionPayment.objects.filter(
                 customer__customer_id=customer_id,
@@ -245,3 +244,20 @@ def get_customer_outstanding_aging(route=None):
             aging_report.append(aging_data)
 
     return aging_report
+
+
+@register.simple_tag
+def get_customer_wise_outstanding_details(customer, closing_date, to_date):
+    
+    opening_amount = OutstandingAmount.objects.filter(customer_outstanding__customer__pk=customer, customer_outstanding__created_date__date__lte=closing_date).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+    opening_collection = CollectionPayment.objects.filter(customer__pk=customer, created_date__date__lte=closing_date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+    
+    opening_amount = opening_amount - opening_collection
+    
+    collection_upto = CollectionPayment.objects.filter(customer__pk=customer, created_date__date__gt=closing_date, created_date__date__lt=to_date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+    
+    return{
+        "opening_amount": opening_amount,
+        "collection_upto": collection_upto,
+        "balance_amount": opening_amount - collection_upto,
+    }

@@ -19,14 +19,14 @@ urlpatterns = [
     path('defaultprice_create', Defaultprice_Create.as_view(), name='defaultprice_create'),
     path('defaultprice_edit/<str:pk>', Defaultprice_Edit.as_view(), name='defaultprice_edit'),
     path('defaultprice_delete/<str:product_name>', Defaultprice_Delete.as_view(), name='defaultprice_delete'),
-    
+    #-------------------************Orders*************--------------------
     path('staff-issue-orders-list',staff_issue_orders_list, name='staff_issue_orders_list'),
     path('staff-issue-order-details/<str:staff_order_id>/', staff_issue_orders_details_list, name='staff_issue_orders_details_list'),
-    path('staff-issue-order-delete/<str:staff_order_id>/', delete_staff_order, name='delete_staff_order'),
-    
     path('staffIssueOrdersCreate/<str:staff_order_details_id>/',staffIssueOrdersCreate, name='staffIssueOrdersCreate'),
     path('issue_coupons_orders/', issue_coupons_orders, name='issue_coupons_orders'),
-    # path('coupon_issue_orders_create/',couponIssueOrdersList, name='coupon_issue_orders_create'),
+    path('staff-issue-order-delete/<str:staff_order_id>/', delete_staff_order, name='delete_staff_order'),
+    #-------------------************Orders End *************--------------------
+
     path('product_items', Product_items_List.as_view(), name='product_items'),
     path('product_items_create',Product_items_Create.as_view(), name='product_items_create'),
     path('product_item_edit/<str:pk>',Product_Item_Edit.as_view(), name='product_item_edit'),

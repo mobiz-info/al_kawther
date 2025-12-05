@@ -28,7 +28,7 @@ urlpatterns = [
     path('download-salesreport-excel/', download_salesreport_excel, name='download_salesreport_excel'),
 
     
-    path('collection_report', new_collection_report, name='collection_report'),
+    path('collection_report', collection_report, name='collection_report'),
     # path('dailycollectionreport', dailycollectionreport, name='dailycollectionreport'),
     path('collection_report_excel/', collection_report_excel, name='collection_report_excel'),
     path('print_collection_report/', print_collection_report, name='print_collection_report'),
@@ -103,6 +103,7 @@ urlpatterns = [
     path('print-dsr-summary/', print_dsr_summary, name='print_dsr_summary'),
     # path('export-dsr-summary/', export_daily_summary_report, name='export_dsr_summary'),
     path('dsr-summary1/', dsr_summary1, name='dsr_summary1'),
+    path("get-salesmen/", get_salesmen_by_route, name="get_salesmen_by_route"),
     #------------------------------Bottle Count-------------------------------------
     path('van-route-bottle-count/', van_route_bottle_count, name='van_route_bottle_count'),
     path('vans-route-bottle-count-add/<uuid:van_id>/',VansRouteBottleCountAdd, name='bottle_count_add'),
@@ -126,7 +127,7 @@ urlpatterns = [
     path('receipt_list_print/', receipt_list_print, name='receipt_list_print'),
     path('receipt_list_excel/', receipt_list_excel, name='receipt_list_excel'),
 
-    path('delete_receipt/<str:receipt_number>/<uuid:customer_id>/', delete_receipt, name='delete_receipt'),
+    path('delete_receipt/<path:receipt_number>/<uuid:customer_id>/', delete_receipt, name='delete_receipt'),
 
     path('monthly_sales_report/', monthly_sales_report, name='monthly_sales_report'),
     path('monthly_sales_report_print/', monthly_sales_report_print, name='monthly_sales_report_print'),
@@ -155,20 +156,10 @@ urlpatterns = [
     path('scrap_clearance_to_excel/', scrap_clearance_to_excel, name='scrap_clearance_to_excel'),
 
     path('route_wise_bottle_count/', route_wise_bottle_count, name='route_wise_bottle_count'),
-
-    path('credit_coupon_sales_report', credit_coupon_sales_report, name='credit_coupon_sales_report'),
-    path('credit_coupon_sales_print', credit_coupon_sales_print, name='credit_coupon_sales_print'),
-    path('credit-coupon-sales/excel/', credit_coupon_sales_excel, name='credit_coupon_sales_excel'),
+    path('custody_custom_list/', custody_custom_list, name='custody_custom_list'),
+    path('custody-custom/<uuid:custody_id>/', custody_custom_detail, name='custody_custom_detail'),
     
-    path('credit-coupon-sales-report/detail/<str:route>/', credit_coupon_sales_detail, name='credit_coupon_sales_detail'),
-    path('credit-coupon-sales-report/print/<str:route>/', credit_coupon_sales_pdf, name='credit_coupon_sales_pdf'),
-    path('credit-coupon-sales-report/excel/<str:route>/', credit_coupon_sales_export, name='credit_coupon_sales_export'),
-    
-    path("coupon/manual-detail/", manual_coupon_detail_view, name="manual_coupon_detail"),
-    path("coupon/manual-detail-print/", manual_coupon_print_view, name="manual_coupon_detail_print"),
-    path("coupon/manual-detail-excel/", manual_coupon_detail_excel, name="manual_coupon_detail_excel"),
-    
-    path("van_sales_report/", van_sales_report, name="van_sales_report"),
-
+    path("collection/<uuid:customer_id>/", collection, name="collection"),
+    path('collection_payment/<uuid:customer_id>/', collection_payment, name='collection_payment'),
 
 ]

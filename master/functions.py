@@ -117,6 +117,7 @@ def get_next_visit_date(visit_schedule):
         week_number = f'Week{week_num}'
         
         week_days = []
+        
 
         for day, weeks in visit_schedule.items():
             if week_number in weeks:

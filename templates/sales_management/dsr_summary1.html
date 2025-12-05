@@ -27,23 +27,11 @@
                         <form method="GET" action=".">
                             <div class="card-body">
                                 <div class="row align-items-center">
-                                    <div class="col-4">
+                                    <div class="col-3">
                                         <label for="date">Date:</label>
                                         <input type="date" class="form-control" id="date" name="date" value="{{ filter_data.filter_date }}">
                                     </div>
                                     <div class="col-3">
-                                        <label for="salesman">Salesman:</label>
-                                        <select name="salesman_id" class="form-select">
-                                            <option value="">All Salesmen</option>
-                                            {% for salesman in salesman_instances %}
-                                                <option value="{{ salesman.id }}" {% if salesman.id == filter_data.salesman_id %}selected{% endif %}>
-                                                    {{ salesman.get_fullname }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                        
-                                    </div>
-                                    {% comment %} <div class="col-4">
                                         <label for="product">Routes :</label>
                                         <select name="route_name" class="form-select">
                                             <option value="">All Routes</option>
@@ -51,7 +39,15 @@
                                                 <option value="{{ route.route_name }}"  {% if route.route_name == filter_data.route_name %}selected{% endif %}>{{ route.route_name }}</option>
                                             {% endfor %}
                                         </select>
-                                    </div> {% endcomment %}
+                                    </div>
+
+                                    <div class="col-3">
+                                        <label for="salesman">Salesman :</label>
+                                        <select name="salesman_id" id="salesman" class="form-select">
+                                            <option value="">Select Salesman</option>
+                                        </select>
+                                    </div>
+                                    
                                     <div class="col d-flex align-items-end justify-content-end">
                                         <input type="submit" class="btn btn-primary btn-sm mx-1" value="Apply Filter">
                                         {% if data_filter %}
@@ -135,8 +131,8 @@
                                         <th scope="col" style="text-align:center;">Offload</th>
                                         <th scope="col" style="text-align:center;">Empty Bottle</th>
                                         {% comment %} <th scope="col" style="text-align:center;">Custody Issued</th> {% endcomment %}
-                                        <th scope="col" style="text-align:center;">Fresh Stock</th>
-                                        <th scope="col" style="text-align:center;">Closing</th>
+                                        {% comment %} <th scope="col" style="text-align:center;">Fresh Stock</th> {% endcomment %}
+                                        <th scope="col" style="text-align:center;">Closing Stock</th>
                                         <th scope="col" style="text-align:center;">Action</th>
                                     </tr>
                                 </thead>
@@ -156,7 +152,7 @@
                                         <td style="text-align:center;">{{stock_details.offload_count}}</td>
                                         <td style="text-align:center;">{{van_data.empty_can_count}}</td>
                                         {% comment %} <td style="text-align:center;"></td> {% endcomment %}
-                                        <td style="text-align:center;">{{stock_report_total}}</td>
+                                        {% comment %} <td style="text-align:center;">{{stock_report_total}}</td> {% endcomment %}
                                         <td style="text-align:center;">{{van_data.closing_count}}</td>
                                         <td>
                                             <div class="g-2">
@@ -894,16 +890,55 @@
     </div>
 </div>
 
-
-
-
-
 <script>
     function resetFilters() {
         // Redirect to the same page
         location.href = "{% url 'dsr_summary1' %}";
     }
 </script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+        function getUrlParameter(name) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        function fetchSalesmen(routeName, selectedSalesman) {
+            if (routeName) {
+                $.ajax({
+                    url: "{% url 'get_salesmen_by_route' %}",  
+                    data: { route_name: routeName },
+                    success: function (response) {
+                        var salesmanDropdown = $("#salesman");
+                        salesmanDropdown.empty();
+                        salesmanDropdown.append('<option value="">Select Salesman</option>');
+
+                        $.each(response.salesmen, function (index, salesman) {
+                            var selected = (salesman.id == selectedSalesman) ? "selected" : "";
+                            salesmanDropdown.append('<option value="' + salesman.id + '" ' + selected + '>' + salesman.name + '</option>');
+                        });
+                    }
+                });
+            } else {
+                $("#salesman").empty().append('<option value="">Select Salesman</option>');
+            }
+        }
+
+        $("select[name='route_name']").change(function () {
+            var routeName = $(this).val();
+            fetchSalesmen(routeName, "");
+        });
+
+        var preselectedRoute = $("select[name='route_name']").val();
+        var preselectedSalesman = getUrlParameter("salesman_id"); 
+
+        if (preselectedRoute) {
+            fetchSalesmen(preselectedRoute, preselectedSalesman);
+        }
+    });
+</script>
+
 
 {% endblock %}
 

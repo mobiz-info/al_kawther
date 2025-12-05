@@ -32,7 +32,7 @@ from master.models import CategoryMaster
 
 class ProductForm(forms.ModelForm):
     category = forms.ModelChoiceField(
-        queryset=CategoryMaster.objects.filter(is_deleted=False),
+        queryset=CategoryMaster.objects.all(),
         label='Category',
         widget=forms.Select(attrs={'class': 'form-control'})
     )

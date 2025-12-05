@@ -44,7 +44,7 @@ class Command(BaseCommand):
                     stock=total_stock
                 )
         
-        if (nextday_instances:=NextDayStockRequest.objects.filter(date=today,product=yesterday_stock.product,van=yesterday_stock.van)).exists():
-            nextday_stock = int(nextday_instances.first().issued_quantity)
+            if (nextday_instances:=NextDayStockRequest.objects.filter(date=today,product=yesterday_stock.product,van=yesterday_stock.van)).exists():
+                nextday_stock = int(nextday_instances.first().issued_quantity)
             
         self.stdout.write(self.style.SUCCESS('Stock update process completed.'))

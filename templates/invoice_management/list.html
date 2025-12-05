@@ -72,12 +72,11 @@
                                     <th scope="col" class="text-center">Sl.No</th>
                                     <th scope="col" class="text-center">Created Date</th>
                                     <th scope="col" class="text-center">Invoice No</th>
-                                    <th scope="col" class="text-left">Customer Id</th>
                                     <th scope="col" class="text-left">Customer Name</th>
+                                    <th scope="col" class="text-left">Customer Id</th>
                                     <th scope="col" class="text-left">Invoice Type</th>
-                                    <th scope="col" class="text-center">Total<br>Before VAT</th>
-                                    <th scope="col" class="text-center">VAT (5%)</th>
-                                    {% comment %} <th scope="col" class="text-center">VAT (5%)</th> {% endcomment %}
+                                    <th scope="col" class="text-center">Net Taxeble</th>
+                                    <th scope="col" class="text-center">VAT</th>
                                     <th scope="col" class="text-center">Total Amount</th>
                                     <th scope="col" class="text-center">Amount Recieved</th>
                                     <th scope="col" class="text-center">Status</th>
@@ -95,10 +94,9 @@
                                         <td class="text-center">{{instance.customer.customer_name}}</td>
                                         <td class="text-center">{{instance.customer.custom_id}}</td>
                                         <td class="text-center">{{instance.get_invoice_type_display}}</td>
+                                        <td class="text-center">{{instance.net_taxable}}</td>
+                                        <td class="text-center">{{instance.vat}}%</td>
                                         <td class="text-center">{{instance.amout_total}}</td>
-                                        <td class="text-center">{{instance.vat}}</td>
-                                        {% comment %} <td class="text-center">{{instance.get_vat_amount}}</td> {% endcomment %}
-                                        <td class="text-center">{{instance.sub_total}}</td>
                                         <td class="text-center">{{instance.amout_recieved}}</td>
                                         <td class="text-center">{{instance.get_invoice_status_display}}</td>
                                         <td class="text-right">

@@ -161,3 +161,12 @@ class PrivacyForm(forms.ModelForm):
         widgets = {
             'content': CKEditorWidget(),
         }
+class PermissionManagementTabForm(forms.ModelForm):
+    class Meta:
+        model = PermissionManagementTab
+        fields = ['tab_name', 'department']
+
+        widgets = {
+            'tab_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Tab Name'}),
+            'department': forms.Select(attrs={'class': 'form-control'}),
+        }

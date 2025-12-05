@@ -42,7 +42,7 @@ from master.functions import log_activity
 @permission_classes((AllowAny,))
 @renderer_classes((JSONRenderer,))
 def get_building_no(request,route_id):
-    customers = Customers.objects.filter(routes__pk=route_id)
+    customers = Customers.objects.filter(is_guest=False, routes__pk=route_id)
     serialized = BuildingNameSerializers(customers, many=True, context={"request":request})
 
     response_data = {
@@ -55,7 +55,7 @@ def get_building_no(request,route_id):
 @permission_classes((AllowAny,))
 @renderer_classes((JSONRenderer,))
 def get_customer(request,route_id,building_no):
-    customers = Customers.objects.filter(routes__pk=route_id,building_name=building_no)
+    customers = Customers.objects.filter(is_guest=False, routes__pk=route_id,building_name=building_no)
     serialized = CustomersSerializers(customers, many=True, context={"request":request})
 
     response_data = {
@@ -425,7 +425,7 @@ def edit_invoice(request,pk):
         # )
                 
         route_instances = RouteMaster.objects.all()
-        building_names_queryset = Customers.objects.filter(routes=invoice_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
+        building_names_queryset = Customers.objects.filter(is_guest=False, routes=invoice_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
         # building_names = [name for name in building_names_queryset if isinstance(name, str) and name.strip()]
         
 
@@ -485,7 +485,7 @@ def delete_invoice(request, pk):
                 customer_supply_instance.delete()
                 supply_items_instances.delete()
                 
-            if CustomerCoupon.objects.filter(invoice_no=invoice.invoice_no).exists():
+            elif CustomerCoupon.objects.filter(invoice_no=invoice.invoice_no).exists():
                 customer_coupons = CustomerCoupon.objects.filter(invoice_no=invoice.invoice_no)
                 
                 for customer_coupon in customer_coupons:
@@ -536,13 +536,9 @@ def delete_invoice(request, pk):
                     
                     customer_coupon.delete()
                 
-            if CustomerOutstanding.objects.filter(invoice_no=invoice.invoice_no).exists():
+            if CustomerOutstanding.objects.filter(created_date__date=invoice.created_date.date(),customer=invoice.customer, invoice_no=invoice.invoice_no).exists():
                 # Retrieve outstanding linked to the invoice
-                outstanding = CustomerOutstanding.objects.get(invoice_no=invoice.invoice_no)
-                
-                # Reverse the outstanding invoice creation
-                outstanding.invoice_no = None
-                outstanding.save()
+                outstanding = CustomerOutstanding.objects.filter(created_date__date=invoice.created_date.date(),customer=invoice.customer, invoice_no=invoice.invoice_no).delete()
                 
                 log_activity(request.user, f"Adjusted outstanding for invoice #{invoice.invoice_no}.")
                 # Adjust CustomerOutstandingReport
@@ -585,13 +581,13 @@ def delete_invoice(request, pk):
         }
         return HttpResponse(json.dumps(response_data), status=status.HTTP_404_NOT_FOUND, content_type='application/javascript')
 
-    except Exception as e:
-        response_data = {
-            "status": "false",
-            "title": "Failed",
-            "message": str(e),
-        }
-        return HttpResponse(json.dumps(response_data), status=status.HTTP_500_INTERNAL_SERVER_ERROR, content_type='application/javascript')
+    # except Exception as e:
+    #     response_data = {
+    #         "status": "false",
+    #         "title": "Failed",
+    #         "message": str(e),
+    #     }
+    #     return HttpResponse(json.dumps(response_data), status=status.HTTP_500_INTERNAL_SERVER_ERROR, content_type='application/javascript')
 
     # except Invoice.DoesNotExist:
     #     response_data = {

@@ -7,7 +7,7 @@
     <h4 class="fw-medium mb-0">Missed Customers on Delivery</h4>
     <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Client Management</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Missing Customer</li>
+        <li class="breadcrumb-item active" aria-current="page">Missed Customers</li>
     </ol>
 </div>
 
@@ -25,13 +25,17 @@
                             </a>
                         </div>
                     </div>
+                    
                     <div class="card-body">
                         <table class="table table-bordered text-nowrap" style="width:100%">
                             <thead>
                                 <tr>
-                                    <th style="text-align:center !important;width:5%;" scope="col">Sl.No</th>
-                                    <th style="text-align:center !important;" scope="col">Customer Name</th>
+                                    <th style="text-align:center !important;width:5%;" scope="col">
+                                        <input class="form-check-input" type="checkbox" value="" id="allTickCheck">
+                                        Sl.No
+                                    </th>
                                     <th style="text-align:center !important;" scope="col">Customer ID</th>
+                                    <th style="text-align:center !important;" scope="col">Missed Customer Name</th>
                                     <th style="text-align:center !important;" scope="col">Building Name/<br>House No</th>                                    <th style="text-align:center !important;" scope="col">Customer Type</th>
                                     <th style="text-align:center !important;" scope="col">Default Bottle</th>
                                     <th style="text-align:center !important;" scope="col">Last Sold Date</th>
@@ -41,9 +45,12 @@
                             <tbody>
                                 {% for customer in missed_customers %}
                                     <tr>
-                                        <td style="text-align:center !important;">{{ forloop.counter }}</td>
-                                        <td style="text-align:center !important;">{{ customer.customer_name }}</td>
+                                        <td style="text-align:center !important;">
+                                            <input class="form-check-input customer-checkboxs" type="checkbox" value="{{ customer.customer_id }}" id="listTick{{ customer.customer_id }}">
+                                            {{ forloop.counter }}
+                                        </td>
                                         <td style="text-align:center !important;">{{ customer.custom_id }}</td>
+                                        <td style="text-align:center !important;">{{ customer.customer_name }}</td>
                                         <td style="text-align:center !important;">{{ customer.building_name }} {{ customer.door_house_no }}</td>
                                         <td style="text-align:center !important;">{{ customer.customer_type }}</td>
                                         <td style="text-align:center !important;">{{ customer.no_of_bottles }}</td>
@@ -64,21 +71,121 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="6" style="text-align:center !important;">No missing customers found.</td>
+                                        <td colspan="6" style="text-align:center !important;">No Missed Customers found.</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                         <!-- Back Button -->
-                        <div class="text-end mt-4">
+                        <div class="d-flex align-items-center justify-content-between mt-4 gap-2">
                             <button class="btn btn-success" type="button" onclick="javascript:history.go(-1);">
                                 <i class="bi bi-backspace-fill pe-1"></i> Back
                             </button>
+                        
+                            <div class="d-flex align-items-center gap-2">
+                                <label for="date" class="mb-0">Date:</label>
+                                <input type="date" class="form-control" id="scheduleDate" name="schedule_date">
+                                <button class="btn btn-primary" id="moveScheduleButton" type="button">Schedule</button>
+                            </div>
                         </div>
+                        
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal -->
+<div class="modal fade" id="warningModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content text-danger">
+        <div class="modal-header">
+          <h5 class="modal-title">Warning</h5>
+        </div>
+        <div class="modal-body" id="modalMessage">
+          
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}
+{% block static %}
+{% load static %}
+<script>
+    document.getElementById('allTickCheck').addEventListener('change', function () {
+      const checkboxes = document.querySelectorAll('.customer-checkboxs');
+      checkboxes.forEach(cb => cb.checked = this.checked);
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    document.getElementById('moveScheduleButton').addEventListener('click', function () {
+        const checkboxes = document.querySelectorAll('.customer-checkboxs:checked');
+        const scheduleDate = document.getElementById('scheduleDate').value;
+        const selectedValues = Array.from(checkboxes).map(cb => cb.value);
+    
+        const warningModal = new bootstrap.Modal(document.getElementById('warningModal'));
+        const modalMessage = document.getElementById('modalMessage');
+    
+        let forwardData = true;
+    
+        if (!scheduleDate) {
+            forwardData = false;
+            modalMessage.innerHTML = "Please select a schedule date.";
+            warningModal.show();
+            return;
+        }
+    
+        if (selectedValues.length === 0) {
+            forwardData = false;
+            modalMessage.innerHTML = "Select at least one checkbox.";
+            warningModal.show();
+            return;
+        }
+    
+        if (forwardData) {
+            fetch('{% url "move_schedule_view" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({
+                    date: scheduleDate,
+                    customers: selectedValues
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                location.reload(true);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                modalMessage.innerHTML = "Something went wrong while saving.";
+                warningModal.show();
+            });
+        }
+    });
+    
+    
+    
+    
+  </script>
+{% endblock static %}

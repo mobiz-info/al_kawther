@@ -7,6 +7,8 @@ admin.site.register(Van_Routes)
 admin.site.register(VanStock)
 admin.site.register(VanProductItems)
 admin.site.register(VanCouponItems)
+admin.site.register(FreelanceVehicleOtherProductChargesChanges)
+admin.site.register(FreelanceVehicleOtherProductCharges)
 
 class ExpenseAdmin(admin.ModelAdmin):
     list_display = ('date_created','expense_date','expence_type','amount')
@@ -34,3 +36,6 @@ admin.site.register(VanCouponStock,VanCouponStockAdmin)
 class BottleCountAdmin(admin.ModelAdmin):
     list_display = ('created_date','van','opening_stock','custody_issue','custody_return','qty_added','qty_deducted','closing_stock')
 admin.site.register(BottleCount,BottleCountAdmin)
+
+admin.site.register(AuditBase)
+admin.site.register(AuditDetails)

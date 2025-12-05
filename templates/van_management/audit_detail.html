@@ -1,7 +1,8 @@
 {% extends 'base.html' %}
 {% block title %} Audit Details Report {% endblock %}
 {% block content %}
-{% load client_templatetags %}
+
+{% load van_template_tags %}
 
 <!-- Page Header -->
 <div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between ">
@@ -90,33 +91,76 @@
                                     <thead>
                                         <tr>
                                         <th style="text-align:center;width:5%;" scope="col">Sl.No</th>
+                                        <th>Customer ID</th>
                                         <th>Customer</th>
-                                        <th>Current Outstanding Amount</th>
+                                        <th>Previous Outstanding Amount</th>
                                         <th>Audit Outstanding Amount</th>
                                         <th>Amount Variation</th>
-                                        <th>Current Outstanding Coupon</th>
+                                        <th>Previous Outstanding Coupon</th>
                                         <th>Audit Outstanding Coupon</th>
                                         <th>Coupon Variation</th>
-                                        <th>Current Bottle Count</th>
+                                        <th>Previous Bottle Count</th>
                                         <th>Audit Bottle Count</th>
                                         <th>Bottle Variation</th>
+                                        <th>Previous Hot & Cold Dispenser</th>
+                                        <th>Audit Hot & Cold Dispenser</th>
+                                        <th>Hot & Cold Variation</th>
+                                        <th>Previous Table Dispenser</th>
+                                        <th>Audit Table Dispenser</th>
+                                        <th>Table Variation</th>
+                                        <th>Remarks</th>
                                     </tr>
                                     </thead>
                                     <tbody>
-                                        {% for item in audit_combined %}
+                                        {% for item in audit_details %}
+                                        {% get_audit_details item.pk as audit_data%}
                                         <tr>
                                             <td style="text-align:center">{{ forloop.counter }}</td>
-                                            <td>{{ item.customer }}</td>
+                                            <td>{{ item.customer.custom_id }}</td>
+                                            <td>{{ item.customer.customer_name }}</td>
+                                            <td>{{ item.previous_outstanding_amount }}</td>
                                             <td>{{ item.outstanding_amount }}</td>
-                                            <td>{{ item.amount_variation }}</td>
+                                            <td>{{ item.get_amount_variation }}</td>
+                                            <td>{{ item.previous_outstanding_coupon }}</td>
                                             <td>{{ item.outstanding_coupon }}</td>
-                                            <td>{{ item.coupon_variation }}</td>
-                                            <td>{{ item.bottle_count }}</td>
-                                            <td>{{ item.bottle_variation }}</td>
+                                            <td>{{ item.get_coupon_variation }}</td>
+                                            <td>{{ item.previous_bottle_outstanding }}</td>
+                                            <td>{{ item.bottle_outstanding }}</td>
+                                            <td>{{ item.get_bottle_variation }}</td>
+                                            <td>{{ item.previous_hot_and_cold_dispenser }}</td>
+                                            <td>{{ item.hot_and_cold_dispenser }}</td>
+                                            <td>{{ item.get_hot_and_cold_variation }}</td>
+                                            <td>{{ item.previous_table_dispenser }}</td>
+                                            <td>{{ item.table_dispenser }}</td>
+                                            <td>{{ item.get_table_dispenser_variation }}</td>
+                                            <td>{{ item.remarks }}</td>
+                                            
                                         </tr>
                                         {% endfor %}
                                     </tbody>
+                                    <tfoot>
+                                        <tr style="font-weight: bold;">
+                                            <td colspan="3" class="text-end">Total</td>
+                                            <td>{{ totals.previous_outstanding_amount }}</td>
+                                            <td>{{ totals.audit_outstanding_amount }}</td>
+                                            <td>{{ totals.amount_variation }}</td>
+                                            <td>{{ totals.previous_outstanding_coupon }}</td>
+                                            <td>{{ totals.audit_outstanding_coupon }}</td>
+                                            <td>{{ totals.coupon_variation }}</td>
+                                            <td>{{ totals.previous_bottle }}</td>
+                                            <td>{{ totals.audit_bottle }}</td>
+                                            <td>{{ totals.bottle_variation }}</td>
+                                            <td>{{ totals.previous_hot_and_cold }}</td>
+                                            <td>{{ totals.audit_hot_and_cold }}</td>
+                                            <td>{{ totals.hot_and_cold_variation }}</td>
+                                            <td>{{ totals.previous_table }}</td>
+                                            <td>{{ totals.audit_table }}</td>
+                                            <td>{{ totals.table_variation }}</td>
+                                            <td></td>
+                                        </tr>   
+                                    </tfoot>
                                 </table>
+                            </div>
                         </div>
                     </div>
                 </div>

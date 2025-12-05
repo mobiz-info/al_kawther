@@ -2,6 +2,7 @@ from django import forms
 from django.forms import ModelForm
 
 from sales_management.models import CollectionPayment
+from van_management.models import *
 from .models import *
 from accounts.models import Customers
 from django.db.models import Q
@@ -286,7 +287,7 @@ class CustomerSupplyForm(forms.ModelForm):
     
     class Meta:
         model = CustomerSupply
-        fields = ['adding_date','grand_total','discount','net_payable','vat','subtotal','amount_recieved','collected_empty_bottle','allocate_bottle_to_pending','allocate_bottle_to_custody','allocate_bottle_to_paid','reference_number']
+        fields = ['adding_date','grand_total','discount','net_payable','vat','subtotal','amount_recieved','collected_empty_bottle','allocate_bottle_to_free','allocate_bottle_to_custody','allocate_bottle_to_paid','reference_number']
 
         widgets = {
             # 'created_date': forms.DateInput(attrs={'class': 'form-control', 'id': 'date-input'}),
@@ -297,7 +298,7 @@ class CustomerSupplyForm(forms.ModelForm):
             'subtotal': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Sub Total'}),
             'amount_recieved': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Amount Recieved'}),
             'collected_empty_bottle': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Collected Empty Bottle'}),
-            'allocate_bottle_to_pending': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Pending'}),
+            'allocate_bottle_to_free': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Pending'}),
             'allocate_bottle_to_custody': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Custody'}),
             'allocate_bottle_to_paid': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Paid'}),
             'reference_number': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Reference No.'}),
@@ -311,7 +312,7 @@ class EditCustomerSupplyForm(forms.ModelForm):
 
     class Meta:
         model = CustomerSupply
-        fields = ['grand_total','discount','net_payable','vat','subtotal','amount_recieved','collected_empty_bottle','allocate_bottle_to_pending','allocate_bottle_to_custody','allocate_bottle_to_paid','reference_number']
+        fields = ['grand_total','discount','net_payable','vat','subtotal','amount_recieved','collected_empty_bottle','allocate_bottle_to_free','allocate_bottle_to_custody','allocate_bottle_to_paid','reference_number']
 
         widgets = {
             'grand_total': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Grand Total'}),
@@ -321,7 +322,7 @@ class EditCustomerSupplyForm(forms.ModelForm):
             'subtotal': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Sub Total'}),
             'amount_recieved': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Amount Recieved'}),
             'collected_empty_bottle': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Collected Empty Bottle'}),
-            'allocate_bottle_to_pending': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Pending'}),
+            'allocate_bottle_to_free': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Pending'}),
             'allocate_bottle_to_custody': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Custody'}),
             'allocate_bottle_to_paid': forms.TextInput(attrs={'class': 'form-control', 'required': True, 'placeholder': 'Enter Allocated to Bottle Paid'}),
             'reference_number': forms.TextInput(attrs={'class': 'form-control', 'required': False, 'placeholder': 'Enter Reference No.'}),
@@ -365,21 +366,23 @@ class CustomerOutstandingForm(forms.ModelForm):
 
     class Meta:
         model = CustomerOutstanding
-        fields = ['customer','product_type']
+        fields = ['customer','product_type', 'created_date']
 
         widgets = {
             'customer': forms.Select(attrs={'class': 'form-control select2', 'data-live-searc':'true'}),
             'product_type': forms.Select(attrs={'class': 'form-control'}),
+            'created_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
         
 class CustomerOutstandingSingleForm(forms.ModelForm):
 
     class Meta:
         model = CustomerOutstanding
-        fields = ['product_type']
+        fields = ['product_type', 'created_date']
 
         widgets = {
             'product_type': forms.Select(attrs={'class': 'form-control'}),
+            'created_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
         
 class CustomerOutstandingAmountForm(forms.ModelForm):
@@ -455,3 +458,31 @@ class EligibleCustomerConditionsForm(forms.ModelForm):
             'moq': forms.NumberInput(attrs={'class': 'form-control'}),
             'days': forms.NumberInput(attrs={'class': 'form-control'}),
         }
+        
+        
+class AuditDetailsForm(forms.ModelForm):
+    class Meta:
+        model = AuditDetails
+        fields = ['outstanding_amount', 'bottle_outstanding', 'outstanding_coupon']
+        
+        widgets = {
+                'outstanding_amount': forms.NumberInput(attrs={'class': 'form-control'}),
+                'bottle_outstanding': forms.NumberInput(attrs={'class': 'form-control'}),
+                'outstanding_coupon': forms.NumberInput(attrs={'class': 'form-control'}),
+            }
+
+class CustodyItemReturnForm(forms.ModelForm):
+    class Meta:
+        model = CustomerReturnItems
+        fields = ['quantity', 'amount', 'serialnumber']
+        labels = {
+            'quantity': 'Quantity',
+            'amount': 'Total Amount',
+            'serialnumber': 'Serial Number',
+        }
+        widgets = {
+            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'serialnumber': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+

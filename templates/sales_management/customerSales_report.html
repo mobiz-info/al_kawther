@@ -38,6 +38,17 @@
                                     <label for="end_date">End Date:</label>
                                     <input type="date" class="form-control" id="end_date" name="end_date" value="{{ filter_data.end_date }}">
                                 </div>
+                                
+                                <div class="col">
+                                    <label for="sales_type">Route:</label>
+                                    <select name="route" class="form-select">
+                                        <option value="">All Routes</option>
+                                        {% for route in route_li %}
+                                            <option value="{{ route.pk }}" {% if route.pk|stringformat:"s" == filter_data.route|stringformat:"s" %}selected{% endif %}>{{ route.route_name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
                                 <div class="col">
                                     <label for="sales_type">Sales Type:</label>
                                     <select id="sales_type" name="sales_type" class="form-select">

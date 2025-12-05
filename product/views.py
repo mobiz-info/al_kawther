@@ -14,7 +14,6 @@ from django.utils.decorators import method_decorator
 from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
 
 from master.functions import log_activity
 from coupon_management.serializers import couponStockSerializers
@@ -465,24 +464,6 @@ def staff_issue_orders_details_list(request,staff_order_id):
         'order_number': order.order_number
         }
     return render(request, 'products/staff_issue_orders_details_list.html', context)
-
-@login_required
-def delete_staff_order(request, staff_order_id):
-    if request.method == "POST":
-        instance = get_object_or_404(Staff_Orders, pk=staff_order_id)
-        if Staff_IssueOrders.objects.filter(staff_Orders_details_id__staff_order_id=instance).exists():
-            return JsonResponse({
-                "status": "false",
-                "message": "Cannot delete. This staff order has already been issued."
-            })
-
-        instance.delete()
-        return JsonResponse({
-            "status": "true",
-            "message": "Order deleted successfully!",
-            "redirect": True,
-            "redirect_url": reverse('staff_issue_orders_list')
-        })
 
 @transaction.atomic
 def staffIssueOrdersCreate(request, staff_order_details_id):
@@ -1045,7 +1026,23 @@ def issue_coupons_orders(request):
                 
         return JsonResponse(response_data)
 
+@login_required
+def delete_staff_order(request, staff_order_id):
+    if request.method == "POST":
+        instance = get_object_or_404(Staff_Orders, pk=staff_order_id)
+        if Staff_IssueOrders.objects.filter(staff_Orders_details_id__staff_order_id=instance).exists():
+            return JsonResponse({
+                "status": "false",
+                "message": "Cannot delete. This staff order has already been issued."
+            })
 
+        instance.delete()
+        return JsonResponse({
+            "status": "true",
+            "message": "Order deleted successfully!",
+            "redirect": True,
+            "redirect_url": reverse('staff_issue_orders_list')
+        })
 #---------------------REPORTS-----
 def product_stock_report(request):
     instances = ProductStock.objects.order_by('-created_date')  # Order by latest created date

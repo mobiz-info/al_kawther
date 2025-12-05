@@ -17,7 +17,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         route_name = "S-01"
         customer_pk = "a869440c-2dab-4d3b-bab8-d553d95b8c48"
-        customer_instances = Customers.objects.filter(pk=customer_pk)
+        customer_instances = Customers.objects.filter(is_guest=False, pk=customer_pk)
         date_part = timezone.now().strftime('%Y%m%d')
         
         for customer in customer_instances:

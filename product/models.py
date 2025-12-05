@@ -26,7 +26,7 @@ SUPERVISOR_STATUS_CHOICES = (
         ('rejected', 'Rejected'),
     )
 class ProdutItemMaster(models.Model):
-    id   = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_by = models.CharField(max_length=20,  blank=True)
     created_date = models.DateTimeField(auto_now_add=True,blank=True, null=True)
     modified_by = models.CharField(max_length=20, null=True, blank=True)
@@ -42,13 +42,31 @@ class ProdutItemMaster(models.Model):
     tax = models.ForeignKey('tax_settings.Tax', on_delete=models.CASCADE, null=True, blank=True)
     rate = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     image = models.ImageField(upload_to='product_images/', null=True, blank=True)
+    is_exported = models.BooleanField(default=False)
     
     class Meta:
         ordering = ('product_name',)
     
     def __str__(self):
         return str(self.product_name)
+
+    def get_erp_product_id(self):
+        export_status = self.product_export_status.first()
+        return export_status.erp_product_id if export_status else None
     
+
+class ProductExportStatus(models.Model):
+    product = models.ForeignKey(ProdutItemMaster, on_delete=models.CASCADE, related_name='product_export_status')
+    erp_product_id = models.CharField(max_length=50, unique=True)
+    exported_date = models.DateTimeField(auto_now_add=True)  
+    
+    class Meta:
+        ordering = ('-exported_date',)
+
+    def __str__(self):
+        return f"Exported {self.product.product_name} with ERP ID {self.erp_product_id}"  
+    
+      
 class Product(models.Model):
     product_id= models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_by = models.CharField(max_length=20,  blank=True)
@@ -153,6 +171,9 @@ class Staff_IssueOrders(models.Model):
     quantity_issued = models.CharField(max_length=50,null=True, blank=True)
     stock_quantity = models.CharField(max_length=50,null=True, blank=True)
     van = models.ForeignKey('van_management.Van', null=True, blank=True, on_delete=models.SET_NULL)
+    
+    empty_bottle_count = models.IntegerField(default=0)
+    extra_bottle_needed = models.IntegerField(default=0)
 
     STATUS_CHOICES = (
         ('Order Issued','Order Issued'),

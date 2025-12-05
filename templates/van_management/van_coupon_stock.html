@@ -22,36 +22,29 @@
                     <div class="card-header">
                         <div class="card-title">Van Coupon Stock</div>
                     </div>
-                    <div class="mt">
-                        <form method="GET">
-                            <div class="card-body">
-                                <div class="row align-items-center">
-                                    <div class="col">
-                                        <label for="date">Date:</label>
-                                        <input type="date" class="form-control" id="date" name="date" value="{{ filter_data.filter_date}}">
-                                    </div>
-                                    
-                                    <div class="col">
-                                        <label for="van_name">Van :</label>
-                                        <select name="van_name" class="form-select">
-                                            <option value="">All Van</option>
-                                            {% for van in van_instances %}
-                                                <option value="{{ van.pk }}"  {% if van.pk == filter_data.filter_van %}selected{% endif %}>{{van.get_van_route}} - {{ van.salesman.get_fullname }} - {{ van.van_make }} - {{ van.plate }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col d-flex align-items-end justify-content-end">
-                                        <input type="submit" class="btn btn-primary btn-sm mx-1" value="Apply Filter">
-                                        <button type="button" class="btn btn-secondary btn-sm mx-1" onclick="resetFilters()" style="width:max-content">Reset Filter</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form> 
-                    </div>
                     {% comment %} <div class="m-4">
                         <div class="tab-content">
                             <div class="tab-pane fade show active" id="products"> {% endcomment %}
                                 <div class="card-body">
+                                    <div class="row justify-content-left mb-5">
+                                        <div class="col-md-3">
+                                            <form method="get" action="" class="d-flex align-items-center">
+                                                <div class="form-group me-2 flex-grow-1">
+                                                    <label for="filter_date" class="visually-hidden">Select Date:</label>
+                                                    <input type="date" id="filter_date" name="date" class="form-control" value="{{ filter_data.filter_date }}">
+                                                </div>
+                                                <button type="submit" class="btn btn-primary mt-0">Filter</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    {% comment %} <form method="get" action="">
+                                        <div class="form-group">
+                                            <label for="filter_date">Select Date:</label>
+                                            <input type="date" id="filter_date" name="date" class="form-control" value="{{ filter_data.filter_date }}">
+                                        </div>
+                                        <button type="submit" class="btn btn-primary mt-2">Filter</button>
+                                    </form> {% endcomment %}
+                                    
                                     <table id="datatable-basic" class="table table-bordered text-nowrap" style="width:100%">
                                         <thead>
                                             <tr>

@@ -32,7 +32,7 @@
                         <div id="table-container" style="overflow-x: auto;">
                             <div class="card-body">
                                 <table class="table table-bordered text-wrap" style="width: 100%">
-                                    {% get_route_sales_report route.route_id start_date as sales_report %}
+                                    
                                         <thead>
                                             <tr>
                                                 <th colspan="11" class="text-center">Route - {{ route.route_name }}</th>
@@ -55,9 +55,12 @@
                                             <tr>
                                                 <th rowspan="2">Date</th>
                                                 <th rowspan="2">Sale Qty</th>
-                                                <th rowspan="2">Cash Sale</th>
-                                                <th rowspan="2">Credit Sale</th>
+                                                <th rowspan="2">Cash Sale QTY</th>
+                                                <th rowspan="2">Cash Sale Amount</th>
+                                                <th rowspan="2">Credit Sale QTY</th>
+                                                <th rowspan="2">Credit Sale Amount</th>
                                                 <th colspan="{{coupon_items_instances_length}}">Coupon Book Sale</th>
+                                                <th rowspan="2">Coupon <br>Supply</th>
                                                 <th rowspan="2">Coupon Leaf <br>Received</th>
                                                 <th rowspan="2">FOC</th>
                                                 <th rowspan="2">Credit Collection</th>
@@ -71,21 +74,25 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {% for report in sales_report %}
+                                            {% for date in date_list %}
+                                            {% get_route_sales_report route.route_id date as sales_report %}
                                             <tr>
-                                                <td>{{ report.date|date:"Y-m-d" }}</td>
-                                                <td>{{ report.sale_qty }}</td>
-                                                <td>{{ report.cash_sale }}</td>
-                                                <td>{{ report.credit_sale }}</td>
+                                                <td>{{ date|date:"d-m-Y" }}</td>
+                                                <td>{{ sales_report.sale_qty }}</td>
+                                                <td>{{ sales_report.total_cash_qty }}</td>
+                                                <td>{{ sales_report.total_cash_amount }}</td>
+                                                <td>{{ sales_report.total_credit_qty }}</td>
+                                                <td>{{ sales_report.total_credit_amount }}</td>
                                                 {% for coupon_item in coupon_items_instances %}
-                                                {% get_supply_coupon_qty route.route_id report.date|date:"Y-m-d" coupon_item.pk as coupon_qty %}
-                                                <td>{{ coupon_qty }}</td>
+                                                {% get_supply_coupon_qty route.route_id date coupon_item.pk as coupon_amount %}
+                                                <td>{{ coupon_amount }}</td>
                                                 {% endfor %}
-                                                <td>{{ report.coupon_received }}</td>
-                                                <td>{{ report.foc }}</td>
-                                                <td>{{ report.credit_collection }}</td>
-                                                <td>{{ report.expense }}</td>
-                                                <td>{{ report.net_cash_in_hand }}</td>
+                                                <td>{{ sales_report.total_coupon_qty }}</td>
+                                                <td>{{ sales_report.coupon_leaf_recieved }}</td>
+                                                <td>{{ sales_report.foc_qty }}</td>
+                                                <td>{{ sales_report.credit_collection }}</td>
+                                                <td>{{ sales_report.expense }}</td>
+                                                <td>{{ sales_report.net_cash_in_hand }}</td>
                                             </tr>
                                             {% endfor %}
                                         </tbody>

@@ -277,7 +277,7 @@ def edit_credit_note(request,pk):
                                                     instance=credit_note_instance)
                 
         route_instances = RouteMaster.objects.all()
-        building_names_queryset = Customers.objects.filter(routes=credit_note_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
+        building_names_queryset = Customers.objects.filter(is_guest=False, routes=credit_note_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
 
         context = {
             'credit_note_form': credit_note_form,

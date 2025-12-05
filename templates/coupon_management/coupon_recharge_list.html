@@ -34,15 +34,6 @@
                                         <input type="date" class="form-control" id="end_date" name="end_date" value="{{ filter_data.end_date }}">
                                     </div>
                                     <div class="col">
-                                        <label for="route">Route:</label>
-                                        <select name="route" class="form-select">
-                                            <option value="">All Routes</option>
-                                            {% for route in route_instances %}
-                                            <option value="{{ route.pk }}" {% if route.route_name == filter_data.route %}selected{% endif %}>{{ route.route_name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col">
                                         <label for="payment_type">Payment Type:</label>
                                         <select name="payment_type" class="form-control" id="payment_type">
                                             <option value="">All</option>
@@ -84,7 +75,6 @@
                                         <th rowspan="2">Date</th>
                                         <th rowspan="2">Customer ID</th>
                                         <th rowspan="2">Customer</th>
-                                        <th rowspan="2">Route</th>
                                         <th rowspan="2">Book Numbers</th>
                                         <th rowspan="2">Salesman</th>
                                         <th rowspan="2">Payment Type</th>
@@ -107,7 +97,6 @@
                                             <td>{{ instance.created_date|date:'d-m-Y' }}</td>
                                             <td>{{ instance.customer.custom_id }}</td>
                                             <td>{{ instance.customer.customer_name }}</td>
-                                            <td>{{ instance.customer.routes.route_name }}</td>
                                             <td>{{ instance.display_coupon_books }}</td>
                                             <td>{{ instance.salesman.get_fullname }}</td>
                                             <td>{{ instance.payment_type }}</td>

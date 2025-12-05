@@ -40,8 +40,10 @@
             <h4 class="card-title mb-0">Customer Information</h4>
         </div>
         <div class="card-body">
-            <p><strong>Name:</strong> {{customer_name  }}</p>
-            <p><strong>Address:</strong> {{building_name }}/{{door_house_no}}/{{floor_no}}</p>
+            <div class="col-md-4"><strong>Customer ID:</strong> {{ customer_id }}</div>
+            <div class="col-md-4"><strong>Customer Name:</strong> {{ customer_name }}</div>
+            <div class="col-md-4"><strong>Route:</strong> {{ route_name }}</div>
+            
             <!-- Add any other customer fields as necessary -->
         </div>
     </div>        <div class="card custom-card">
@@ -216,56 +218,6 @@
                                 </tr>
                             </tfoot>
                         </table>
-                    </div>
-
-                    <div id="table-container">
-                        <h5>Customer Return</div>
-                        <div class="card-body">
-                            <table class="table table-bordered text-wrap" style="width: 100%">
-                                <thead>
-                                    <tr>
-                                        <th rowspan="2">Sl No</th>
-                                        <th>Product</th>
-                                        <th>Quantity</th>
-                                        <th>Serial Numbers</th>
-                                        <th>Amount</th>
-                                        <th>Return Date</th>
-                                        <th>Reference No</th>
-                                        <th>Agreement No</th>
-                                        <th>Deposit Type</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in custody_return_instances %}
-                                        <tr>
-                                            <td>{{ forloop.counter }}</td>
-                                            <td>{{ item.product.product_name }}</td>
-                                            <td>{{ item.quantity }}</td>
-                                            <td>{{ item.serialnumber }}</td>
-                                            <td>{{ item.amount }}</td>
-                                            <td>{{ item.customer_return.created_date|date:"d/m/Y" }}</td>
-                                            <td>{{ item.customer_return.reference_no }}</td>
-                                            <td>{{ item.customer_return.agreement_no }}</td>
-                                            <td>{{ item.customer_return.deposit_type }}</td>
-                                        </tr>
-                                    {% empty %}
-                                        <tr>
-                                            <td colspan="10">No data found for selected date range.</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colspan="2" class="text-end"><strong>Total</strong></td>
-                                        <td><strong>{{ custody_return_total_qty }}</strong></td>
-                                        <td></td>
-                                        <td><strong>{{ custody_return_total_amount }}</strong></td>
-                                        <td colspan="4"></td>
-                                    </tr>
-                                </tfoot>
-
-                            </table>
-                        </div>
                     </div>
                 </div>
             </div>

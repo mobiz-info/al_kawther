@@ -63,16 +63,16 @@ class OtherProductItemsCustomerRateSerializers(serializers.ModelSerializer):
 class CustomersSerializers(serializers.ModelSerializer):
     location = serializers.SerializerMethodField()
     location_name = serializers.SerializerMethodField()
-    emirate_name = serializers.SerializerMethodField()
     total_supply_count = serializers.SerializerMethodField()
     other_product_rate = serializers.SerializerMethodField()
+    emirate_name = serializers.SerializerMethodField()
     
     class Meta :
         model = Customers
         fields = [
             'customer_id', 'created_by', 'created_date', 'custom_id', 'customer_name',
             'building_name', 'door_house_no', 'floor_no', 'sales_staff', 'routes', 'location',
-            'emirate','emirate_name', 'mobile_no', 'whats_app', 'email_id', 'gps_latitude', 'gps_longitude',
+            'emirate', 'emirate_name',   'mobile_no', 'whats_app', 'email_id', 'gps_latitude', 'gps_longitude',
             'customer_type', 'sales_type', 'no_of_bottles_required', 'max_credit_limit',
             'credit_days', 'no_of_permitted_invoices', 'trn', 'billing_address', 'preferred_time',
             'branch_id', 'is_active', 'visit_schedule', 'is_editable', 'user_id', 'rate',
@@ -92,11 +92,8 @@ class CustomersSerializers(serializers.ModelSerializer):
             location_name=obj.location.location_name
         return location_name
     
-    def get_emirate_name(self, obj):
-        emirate_name=""
-        if obj.emirate:
-            emirate_name=obj.emirate.name
-        return emirate_name
+    def get_emirate_name(self, obj):   
+        return obj.emirate.name if obj.emirate else ""
     
     def get_total_supply_count(self, obj):
         total_quantity = CustomerSupplyItems.objects.filter(

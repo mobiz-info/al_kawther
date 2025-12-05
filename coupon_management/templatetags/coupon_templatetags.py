@@ -22,28 +22,20 @@ def available_free_coupons(coupon_pk):
 @register.simple_tag
 def get_coupon_designation(pk):
     context = {}
-    customer_pk = ""
-    customer_name = ""
-    # print(pk)
-    # print("pk")
     instance = NewCoupon.objects.get(pk=pk)
     coupon_status = CouponStock.objects.get(couponbook=instance).coupon_stock
     # print(CouponStock.objects.get(couponbook=instance).couponbook.pk)
-    # print(coupon_status)
     
     if coupon_status == "customer":
         customer_instance = CustomerCouponItems.objects.filter(coupon=instance).first()
         # print(customer_instance.coupon)
         # if customer_instance.customer_coupon == None:
         #     customer_instance.delete()
-        if customer_instance:
-            customer_instance = customer_instance.customer_coupon.customer
-            customer_pk = customer_instance.pk,
-            customer_name = f"{customer_instance.custom_id} - {customer_instance.customer_name}",
+        customer_instance = customer_instance.customer_coupon.customer
         
         context = {
-            "pk": customer_pk,
-            "name": customer_name,
+            "pk": customer_instance.pk,
+            "name": f"{customer_instance.custom_id} - {customer_instance.customer_name}",
         }
     
     elif coupon_status == "van":
@@ -71,7 +63,6 @@ def get_coupon_designation(pk):
             "pk": "",
             "name": f"Used",
         }
-    # print(context)
     return context
 
 

@@ -38,6 +38,8 @@ class CustomerOutstandingAmountAdmin(admin.ModelAdmin):
         'customer',
         'amount'
     )
+    search_fields = ('customer_outstanding__invoice_no','customer_outstanding__customer__customer_name',)
+    list_filter = ['customer_outstanding__created_date'] 
     ordering = ("-customer_outstanding__created_date",)
     
     def invoice_no(self, obj):
@@ -65,19 +67,21 @@ admin.site.register(OutstandingAmount, CustomerOutstandingAmountAdmin)
 admin.site.register(OutstandingCoupon)
 class CustomerOutstandingReportAdmin(admin.ModelAdmin):
     list_display = ('id','product_type','customer','value')
+    search_fields = ['customer__custom_id','customer__customer_name']
+
 admin.site.register(CustomerOutstandingReport,CustomerOutstandingReportAdmin)
 
 class CustomerSupplyAdmin(admin.ModelAdmin):
     list_display = (
-        'id','created_date','customer', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
+        'id','created_date','customer','invoice_no', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
         'allocate_bottle_to_custody', 'allocate_bottle_to_paid', 'discount',
         'net_payable', 'vat', 'subtotal', 'amount_recieved','outstanding_amount_added',
         'outstanding_coupon_added','outstanding_bottle_added','van_stock_added','van_foc_added',
         'van_emptycan_added','custody_added'
     )
     list_filter = ('salesman',)  # Other filters if needed
-    list_filter = ('customer__routes',)  # Other filters if needed
-    search_fields = ('customer__customer_name',)  # Search by customer name (ForeignKey field)
+    list_filter = ('customer__routes','created_date')  # Other filters if needed
+    search_fields = ('customer__customer_name','invoice_no')  # Search by customer name (ForeignKey field)
 
 admin.site.register(CustomerSupply, CustomerSupplyAdmin)
 
@@ -100,66 +104,14 @@ class DialyCustomersAdmin(admin.ModelAdmin):
 admin.site.register(DialyCustomers,DialyCustomersAdmin)
 
 class CustodyCustomItemsAdmin(admin.ModelAdmin):
-    list_display = ('id','product','quantity','serialnumber','amount')
+    list_display = ('id','customer','product','quantity','serialnumber','amount')
     
-    # def customer(self, obj):
-    #     if obj.custody_custom.customer:
-    #         return obj.custody_custom.customer.customer_name
-    #     else:
-    #         return ""
+    def customer(self, obj):
+        return obj.custody_custom.customer.customer_name
     
     def product(self, obj):
         return obj.product.product_name
 admin.site.register(CustodyCustomItems,CustodyCustomItemsAdmin)
-
-@admin.register(CustodyCustom)
-class CustodyCustomAdmin(admin.ModelAdmin):
-    list_display = (
-        'custody_no',
-        'customer',
-        'agreement_no',
-        'total_amount',
-        'deposit_type',
-        'reference_no',
-        'amount_collected',
-        'sales_type',
-        'created_by',
-        'created_date',
-    )
-    list_filter = ('deposit_type', 'sales_type', 'created_date')
-    search_fields = ('custody_no', 'agreement_no', 'reference_no', 'customer__name')
-    date_hierarchy = 'created_date'
-    readonly_fields = ('custody_no', 'created_date', 'modified_date')
-
-    fieldsets = (
-        ('Custody Information', {
-            'fields': (
-                'customer',
-                'custody_no',
-                'agreement_no',
-                'total_amount',
-                'deposit_type',
-                'reference_no',
-                'amount_collected',
-                'sales_type',
-            )
-        }),
-        ('Audit Information', {
-            'fields': (
-                'created_by',
-                'created_date',
-                'modified_by',
-                'modified_date',
-            )
-        }),
-    )
-
-    def save_model(self, request, obj, form, change):
-        """Auto-fill created_by and modified_by fields."""
-        if not obj.created_by:
-            obj.created_by = request.user.username
-        obj.modified_by = request.user.username
-        super().save_model(request, obj, form, change)
 
 class CustomerCustodyStockAdmin(admin.ModelAdmin):
     list_display = ('id','customer','product','quantity','serialnumber','amount')
@@ -170,42 +122,3 @@ class CustomerCustodyStockAdmin(admin.ModelAdmin):
     def product(self, obj):
         return obj.product.product_name
 admin.site.register(CustomerCustodyStock,CustomerCustodyStockAdmin)
-@admin.register(CustomerReturn)
-class CustomerReturnAdmin(admin.ModelAdmin):
-    list_display = ('return_no', 'customer_name', 'customer_route', 'deposit_type', 'created_date')
-    search_fields = ('return_no', 'customer__customer_name', 'customer__routes__route_name')
-    list_filter = ('deposit_type', 'created_date')
-
-    def customer_name(self, obj):
-        return obj.customer.customer_name if obj.customer else "-"
-    customer_name.short_description = "Customer"
-
-    def customer_route(self, obj):
-        return obj.customer.routes.route_name if obj.customer and obj.customer.routes else "-"
-    customer_route.short_description = "Route"
-
-
-@admin.register(CustomerReturnItems)
-class CustomerReturnItemsAdmin(admin.ModelAdmin):
-    list_display = ('customer_return_no', 'customer_name', 'route_name', 'product', 'quantity', 'amount')
-    search_fields = (
-        'customer_return__return_no',          # search by return number
-        'customer_return__customer__customer_name',  # search by customer name
-        'customer_return__customer__routes__route_name',  # search by route name
-    )
-
-    def customer_return_no(self, obj):
-        return obj.customer_return.return_no if obj.customer_return else "-"
-    customer_return_no.short_description = "Return No"
-
-    def customer_name(self, obj):
-        if obj.customer_return and obj.customer_return.customer:
-            return obj.customer_return.customer.customer_name
-        return "-"
-    customer_name.short_description = "Customer"
-
-    def route_name(self, obj):
-        if obj.customer_return and obj.customer_return.customer and obj.customer_return.customer.routes:
-            return obj.customer_return.customer.routes.route_name
-        return "-"
-    route_name.short_description = "Route"

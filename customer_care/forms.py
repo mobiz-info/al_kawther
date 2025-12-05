@@ -243,10 +243,44 @@ class CustomerRequestType_Edit_Form(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
         }
-class CancelReasonsForm(forms.ModelForm):
+
+class CustomerForm(forms.ModelForm):
+    def __init__(self,branch, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['sales_staff'].queryset = CustomUser.objects.filter(is_active = True,branch_id = branch,designation_id__designation_name = "Sales Executive")
+        self.fields['routes'].queryset = RouteMaster.objects.filter(branch_id=branch)
+
     class Meta:
-        model = CancelReasons
-        fields = ['reason']
+        model = Customers
+        fields = [
+            'customer_name', 'building_name', 'door_house_no', 'floor_no',
+            'sales_staff', 'routes','emirate', 'location', 'mobile_no', 'whats_app',
+            'email_id', 'gps_latitude', 'gps_longitude', 'customer_type','five_g_count_limit','eligible_foc','rate',
+            'sales_type', 'no_of_bottles_required', 'max_credit_limit',
+            'credit_days', 'no_of_permitted_invoices','is_active','is_calling_customer','gps_module_active'
+        ]
         widgets = {
-            'reason': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'customer_name': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'building_name': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'door_house_no': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'floor_no': forms.TextInput(attrs={'class': 'form-control', 'required': 'false'}),
+            'sales_staff': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'routes': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'emirate': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'location': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'mobile_no': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'whats_app': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'email_id': forms.TextInput(attrs={'class': 'form-control', 'required': 'false'}),
+            'gps_latitude': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'gps_longitude': forms.TextInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'customer_type': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'five_g_count_limit': forms.TextInput(attrs={'class': 'form-control', 'required': False,'type':'number'}),
+            'eligible_foc': forms.TextInput(attrs={'class': 'form-control', 'required': False,'type':'number'}),
+            'rate': forms.TextInput(attrs={'class': 'form-control', 'required': False}),
+            'sales_type': forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
+            'no_of_bottles_required': forms.NumberInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'max_credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'credit_days': forms.NumberInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'no_of_permitted_invoices': forms.NumberInput(attrs={'class': 'form-control', 'required': 'true'}),
+            'is_active': forms.CheckboxInput(attrs={}),
         }

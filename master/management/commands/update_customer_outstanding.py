@@ -8,12 +8,13 @@ from decimal import Decimal
 from accounts.models import CustomUser, Customers
 from client_management.models import CustomerOutstanding, OutstandingAmount, CustomerOutstandingReport
 from invoice_management.models import Invoice, InvoiceItems
+from master.functions import generate_invoice_no
 from master.models import BranchMaster, RouteMaster
 from product.models import ProdutItemMaster
 from sales_management.models import CollectionPayment
 
 # Read the Excel file
-file_path = '/home/ra/Downloads/S-42new.xlsx'
+file_path = '/home/ra/Downloads/S-15 OUTSTANDING ADD 15-07-2'
 data = pd.read_excel(file_path)
 print("File path:", file_path)
 print("DataFrame columns:", data.columns)
@@ -23,19 +24,19 @@ data.columns = data.columns.str.strip()
 print("Stripped DataFrame columns:", data.columns)
 
 # Verify that 'amount' column exists
-if 'amount' not in data.columns:
-    raise KeyError("Column 'amount' not found in the DataFrame. Available columns: " + ", ".join(data.columns))
+# if 'amount' not in data.columns:
+#     raise KeyError("Column 'amount' not found in the DataFrame. Available columns: " + ", ".join(data.columns))
 
 # Assuming the excel columns are named as follows:
 # 'customer_name', 'product_type', 'amount', 'created_by', 'modified_by'
 
 @transaction.atomic
 def populate_models_from_excel(data):
-    user = CustomUser.objects.get(username="S-42")
-    date = datetime.strptime("2025-02-13", '%Y-%m-%d')
+    user = CustomUser.objects.get(username="S-15")
+    date = datetime.strptime("2025-07-16", '%Y-%m-%d')
     
-    # outstanding_in = CustomerOutstanding.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-42",product_type='amount')
-    # Invoice.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-42").delete()
+    # outstanding_in = CustomerOutstanding.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-15",product_type='amount')
+    # Invoice.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-15").delete()
     # for outstanding in outstanding_in:
         
     #     ou_report = CustomerOutstandingReport.objects.get(
@@ -43,9 +44,9 @@ def populate_models_from_excel(data):
     #         product_type='amount'
     #         )
     #     ou_report.value -= OutstandingAmount.objects.filter(customer_outstanding=outstanding).aggregate(total=Sum('amount', output_field=DecimalField()))['total'] or 0
-        
+    #     print(outstanding.customer.customer_name)
     # outstanding_in.delete()
-    # CollectionPayment.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-42").delete()
+    # CollectionPayment.objects.filter(created_date__date__lte=date,customer__routes__route_name="S-15").delete()
     
     for index, row in data.iterrows():
         customer_id = int(row['customer_id'])
@@ -63,6 +64,18 @@ def populate_models_from_excel(data):
         except Customers.DoesNotExist:
             print(f"Customer {customer_name} does not exist.")
             continue
+        
+        # outstanding_in = CustomerOutstanding.objects.filter(created_date__date__lte=date,customer=customer,product_type='amount')
+        # Invoice.objects.filter(created_date__date__lte=date,customer=customer).delete()
+        # for outstanding in outstanding_in:
+            
+        #     ou_report = CustomerOutstandingReport.objects.get(
+        #         customer=outstanding.customer,
+        #         product_type='amount'
+        #         )
+        #     ou_report.value -= OutstandingAmount.objects.filter(customer_outstanding=outstanding).aggregate(total=Sum('amount', output_field=DecimalField()))['total'] or 0
+        # outstanding_in.delete()
+        # CollectionPayment.objects.filter(created_date__date__lte=date,customer=customer).delete()
         
         customer_outstanding = CustomerOutstanding.objects.create(
             customer=customer,
@@ -87,28 +100,28 @@ def populate_models_from_excel(data):
         report.value += amount
         report.save()
         
-        date_part = date.strftime('%Y%m%d')
-        if (invoice_last_no:=Invoice.objects.filter(is_deleted=False)).exists():
-            invoice_last_no = invoice_last_no.latest('created_date')
-            last_invoice_number = invoice_last_no.invoice_no
+        # date_part = date.strftime('%Y%m%d')
+        # if (invoice_last_no:=Invoice.objects.filter(is_deleted=False)).exists():
+        #     invoice_last_no = invoice_last_no.latest('created_date')
+        #     last_invoice_number = invoice_last_no.invoice_no
 
-            # Validate the format of the last invoice number
-            parts = last_invoice_number.split('-')
-            if len(parts) == 3 and parts[0] == 'WTR' and parts[1] == date_part:
-                prefix, old_date_part, number_part = parts
-                new_number_part = int(number_part) + 1
-                invoice_number = f'{prefix}-{date_part}-{new_number_part:04d}'
-            else:
-                # If the last invoice number is not in the expected format, generate a new one
-                random_part = str(random.randint(1000, 9999))
-                invoice_number = f'WTR-{date_part}-{random_part}'
-        else:
-            random_part = str(random.randint(1000, 9999))
-            invoice_number = f'WTR-{date_part}-{random_part}'
+        #     # Validate the format of the last invoice number
+        #     parts = last_invoice_number.split('-')
+        #     if len(parts) == 3 and parts[0] == 'WTR' and parts[1] == date_part:
+        #         prefix, old_date_part, number_part = parts
+        #         new_number_part = int(number_part) + 1
+        #         invoice_number = f'{prefix}-{date_part}-{new_number_part:04d}'
+        #     else:
+        #         # If the last invoice number is not in the expected format, generate a new one
+        #         random_part = str(random.randint(1000, 9999))
+        #         invoice_number = f'WTR-{date_part}-{random_part}'
+        # else:
+        #     random_part = str(random.randint(1000, 9999))
+        #     invoice_number = f'WTR-{date_part}-{random_part}'
         
         # Create the invoice
         invoice = Invoice.objects.create(
-            invoice_no=invoice_number,
+            # invoice_no=generate_invoice_no(customer_outstanding.created_date.date()),
             created_date=outstanding_amount.customer_outstanding.created_date,
             net_taxable=outstanding_amount.amount,
             vat=0,
@@ -122,7 +135,7 @@ def populate_models_from_excel(data):
         customer_outstanding.save()
         
         if outstanding_amount.customer_outstanding.customer.sales_type == "CREDIT":
-            invoice.invoice_type = "credit_invoive"
+            invoice.invoice_type = "credit_invoice"
             invoice.save()
 
         # Create invoice items
@@ -139,7 +152,7 @@ def populate_models_from_excel(data):
         
         # for route in routes:
         #     branch = BranchMaster.objects.get(user_id__username="ajman")
-        # routes = RouteMaster.objects.get(route_name="S-42")
+        # routes = RouteMaster.objects.get(route_name="S-03")
         # customer.routes=routes
         # customer.branch_id=routes.branch_id
         # customer.save()

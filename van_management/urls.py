@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path,re_path
 from .views import *
 
 
@@ -69,6 +69,8 @@ urlpatterns = [
     path('route-damage/<uuid:route_id>/', route_damage_detail, name='route_damage_detail'),
     path('route-damage-print/<uuid:route_id>/', route_damage_detail_print, name='route_damage_detail_print'),
     path('route-damage-excel/<uuid:route_id>/', route_damage_detail_excel, name='route_damage_detail_excel'),
+    path('edit-van-sale-damage/<uuid:pk>/', edit_van_sale_damage, name='edit_van_sale_damage'),
+    path('delete-van-sale-damage/<uuid:pk>/', delete_van_sale_damage, name='delete_van_sale_damage'),
 
     path('excess-bottle-counts/', excess_bottle_count_list, name='excess_bottle_count_list'),
     path('excess-bottle-counts/new/', excess_bottle_count_create, name='excess_bottle_count_create'),
@@ -85,4 +87,16 @@ urlpatterns = [
 
     path('audit_report/', audit_report, name='audit_report'),
     path('audit_detail/<uuid:audit_id>/', audit_detail, name='audit_detail'),
+    
+    path('freelancevan',freelancevan, name='freelancevan'),
+    
+    path('freelancevan_rate_change/<str:pk>/', FreelanceVanRateHistoryView.as_view(), name='freelancevan_rate_change'),
+    re_path(r'^freelance_other_product_rate_change/(?P<pk>.*)/$',  FreelanceVanOtherProductRateChangeView.as_view(), name='freelance_other_product_rate_change'),
+    
+    path('freelance_van_bottle_issue/<uuid:van_id>/',freelance_van_bottle_issue, name='freelance_van_bottle_issue'),
+    path('freelancevan_outstanding_details/<uuid:van_id>/', freelance_van_outstanding_details, name='freelancevan_outstanding_details'),
+    path('freelance_van_issue_report/', freelance_van_issue_report, name='freelance_van_issue_report'),
+    path('freelance_van_issue_list/<uuid:van_id>/', freelance_van_issue_list, name='freelance_van_issue_list'),
+    
+
 ]

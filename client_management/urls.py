@@ -8,7 +8,6 @@ from . views import *
 urlpatterns = [
         path('customer_custody_item/<str:customer_id>', customer_custody_item, name='customer_custody_item'),
         path('get_custody_items', get_custody_items, name='get_custody_items'),
-        path("customer-autocomplete/", CustomerAutocomplete.as_view(), name="customer_autocomplete"),
 
         #vacation
         path('vacation_list', vacation_list, name="vacation_list"),
@@ -45,7 +44,6 @@ urlpatterns = [
         path('custody_items_list_report', custody_items_list_report, name='custody_items_list_report'),
         path('custody_issue', custody_issue, name='custody_issue'),
         path('customer_custody_items/<uuid:customer_id>/', get_customercustody, name='customer_custody_items'),
-        path('edit_custody_item/<uuid:pk>/', edit_custody_item, name='edit_custody_item'),
         path('custody_report', custody_report, name='custody_report'),
    
         path('coupon_count/<uuid:pk>/', CouponCountList.as_view(), name='coupon_count_list'),
@@ -63,8 +61,9 @@ urlpatterns = [
         path('print-outstanding-report/', print_outstanding_report, name='print_outstanding_report'),
         re_path(r'^create-customer-outstanding/$', create_customer_outstanding, name='create_customer_outstanding'),
         re_path(r'^customer-outstanding-details/(?P<customer_pk>.*)/$', customer_outstanding_details, name='customer_outstanding_details'),
-        re_path(r'^customer-outstanding-view/(?P<customer_pk>.*)/$', customer_outstanding_view, name='customer_outstanding_view'),
         re_path(r'^customer-outstanding-view-print/(?P<customer_pk>.*)/$', customer_outstanding_print, name='customer_outstanding_print'),
+        re_path(r'^customer-outstanding-view/(?P<customer_pk>.*)/$', customer_outstanding_view, name='customer_outstanding_view'),
+
         re_path(r'^delete-customer-outstanding/(?P<pk>.*)/$', delete_outstanding, name='delete_outstanding'),
 
         # Customer count
@@ -99,9 +98,16 @@ urlpatterns = [
         re_path(r'^delete-eligible-customer-conditions/(?P<pk>.*)/$', delete_eligible_customers_condition, name='delete_eligible_customers_condition'),
         
         re_path(r'^eligible-customers/$', eligible_customers, name='eligible_customers'),
-
-        re_path(r'^pullout_report/$', pullout_report, name='pullout_report'),
         
-        path("custody-approvals/", custody_approvals_list, name="custody_approvals_list"),
-        path("custody-approvals/toggle/<int:pk>/", approve_custody, name="approval_toggle"),
+        
+        #-----------------------------------------Audit---------------------------------------------
+        path("select_executive/", MarketingExecutiveRoutesView.as_view(), name="select_executive"),
+        path("audit_customer_list/<uuid:route_id>/", CustomerListView.as_view(), name="audit_customer_list"),
+        path("audit_details/<uuid:customer_id>/", AuditDetailsView.as_view(), name="audit_details"),
+        
+        path("customer_custody_stock/", customer_custody_stock, name="customer_custody_stock"),
+        path('custody-item-return-pull/<uuid:stock_id>/', custody_item_return_view, name='custody_item_return_pull'),
+
+        path("customer-outstanding-report/", customer_outstanding_report, name="customer_outstanding_report"),
+
 ]

@@ -72,7 +72,7 @@ class CompetitorAnalysisListView(View):
             route_name = form.cleaned_data.get('route_name')
             if route_name:
                 # Assuming the relationship is through a ForeignKey in the Customer model
-                customer_ids = Customers.objects.filter(routes__route_name=route_name).values_list('customer_id', flat=True)
+                customer_ids = Customers.objects.filter(is_guest=False, routes__route_name=route_name).values_list('customer_id', flat=True)
                 # Filter using the correct field, which is 'customer_id__in'
                 competitor_analysis_list = competitor_analysis_list.filter(customer_id__in=customer_ids)
 

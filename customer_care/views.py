@@ -549,7 +549,7 @@ class Coupon_Purchse_Create(View):
                         f'Number of leaflets: {no_of_leaflets}. '
                         f'Your total leaflets count is {total_leaflets}.'
                     )
-                    notification(id_customer.user_id.pk, "Coupon Purchase", notification_body, "National watercustomer")
+                    notification(id_customer.user_id.pk, "Coupon Purchase", notification_body, "Sanawatercustomer")
                 except Exception as e:
                     print(f"Notification error: {e}")
                     messages.error(request, f'Error sending notification: {e}', 'alert-danger')
@@ -694,7 +694,7 @@ class NewRequestHome(View):
     #             if customer.sales_staff:
     #                 sales_man = customer.sales_staff
     #                 print(sales_man,'sales_man')
-    #                 notification_customer(sales_man.pk, "New Request", "A new request has been created.", "National watercustomer")
+    #                 notification_customer(sales_man.pk, "New Request", "A new request has been created.", "Sanawatercustomer")
 
     #             messages.success(request, 'Bottles Successfully Added.', 'alert-success')
     #             return redirect('requestType')
@@ -725,8 +725,8 @@ class NewRequestHome(View):
                     sales_man = customer.sales_staff
                     try:
                         salesman_body = f'A new request has been created. for {customer.customer_name}'
-                        notification(sales_man.pk, "New Water Request", salesman_body, "Al Kawthar Pure Drinking Water")
-                        notification(customer.user_id.pk, "New Water Request", "Your Request Created Succesfull.", "Al Kawthar Pure Drinking Water")
+                        notification(sales_man.pk, "New Water Request", salesman_body, "sanawater")
+                        notification(customer.user_id.pk, "New Water Request", "Your Request Created Succesfull.", "sanawater")
                     except CustomUser.DoesNotExist:
                         messages.error(request, 'Salesman does not exist.', 'alert-danger')
                     except Send_Notification.DoesNotExist:
@@ -971,84 +971,130 @@ class CustomerRequestType_Delete(View):
         rec.delete()
         messages.success(request, 'Request type deleted successfully', 'alert-success')
         return redirect('customer_request_type_list')
+    
+from django.utils import timezone    
+class GuestCustomerList(View):
+    template_name = 'customer_care/guest_customer_list.html'
 
-def cancel_reasons(request):
-    instances = CancelReasons.objects.all()
-    context = {
-        'instances': instances,
-        'is_cancel_reasons_page': True,
-    }
-    return render(request, 'customer_care/cancel_reasons/list.html', context)
+    def get(self, request, *args, **kwargs):
+        filter_data = {}
 
+        query = request.GET.get("q")
+        created_date_filter = request.GET.get('created_date')
+        location_filter = request.GET.get('location')
+        
 
-def create_cancel_reason(request):
-    if request.method == 'POST':
-        form = CancelReasonsForm(request.POST)
+        user_li = Customers.objects.filter(is_guest=True, is_deleted=False).select_related('location', 'routes')
+
+        if query:
+            user_li = user_li.filter(
+                Q(custom_id__icontains=query) |
+                Q(customer_name__icontains=query) |
+                Q(mobile_no__icontains=query) |
+                Q(whats_app__icontains=query) |
+                Q(location__location_name__icontains=query) |
+                Q(building_name__icontains=query)
+            )
+            filter_data['q'] = query
+
+        
+        if created_date_filter:
+            try:
+                created_date_obj = datetime.strptime(created_date_filter, '%Y-%m-%d')
+                created_date_obj = timezone.make_aware(created_date_obj, timezone.get_current_timezone())
+                user_li = user_li.filter(created_date__date=created_date_obj.date())
+                filter_data['created_date'] = created_date_filter
+            except ValueError:
+                messages.error(request, "Invalid date format. Please use YYYY-MM-DD.")
+
+        if location_filter:
+            user_li = user_li.filter(location__location_id=location_filter)
+            filter_data['location'] = location_filter
+
+        
+        route_li = RouteMaster.objects.all()
+        locations = LocationMaster.objects.all()
+
+        log_activity(
+            created_by=request.user,
+            description=f"Viewed guest customer list with filters: {filter_data}"
+        )
+
+        context = {
+            'user_li': user_li.order_by("-created_date"),
+            'route_li': route_li,
+            'filter_data': filter_data,
+            'locations': locations,
+        }
+        return render(request, self.template_name, context)
+    
+    
+class EditGuestCustomerView(View):
+    template_name = "customer_care/edit_guest_customer.html"
+
+    @method_decorator(login_required)
+    def get(self, request, pk):
+        branch = request.user.branch_id
+        print("branch",branch)
+        customer = get_object_or_404(Customers, pk=pk, is_guest=True, is_deleted=False)
+        form = CustomerForm(branch,instance=customer)
+        return render(request, self.template_name, {"form": form, "customer": customer})
+    
+    @method_decorator(login_required)
+    def post(self, request, pk):
+        branch = request.user.branch_id
+        customer = get_object_or_404(Customers, pk=pk, is_guest=True, is_deleted=False)
+        form = CustomerForm(branch,request.POST, instance=customer)
         if form.is_valid():
-            data = form.save(commit=False)
-            data.created_by = str(request.user.id)
-            data.save()
+            customer = form.save(commit=False)
+            customer.is_guest = False 
+            customer.save()
+            messages.success(request, f"{customer.customer_name} has been assigned as a regular customer.")
+            return redirect("guest_customers")
+        return render(request, self.template_name, {"form": form, "customer": customer})
+    
 
-            response_data = {
-                "status": "true",
-                "title": "Successfully Created",
-                "message": "Cancel reason created successfully.",
-                "redirect": "true",
-                "redirect_url": reverse('cancel_reasons'),
+class GuestCustomerOrders(View):
+    template_name = 'customer_care/guest_customer_orders.html'
+
+    def get(self, request, customer_id, *args, **kwargs):
+        try:
+            customer = Customers.objects.get(pk=customer_id, is_guest=True, is_deleted=False)
+            orders = GuestCustomerOrder.objects.filter(customer=customer).order_by('-created_date')
+
+            context = {
+                'customer': customer,
+                'orders': orders
             }
-            return HttpResponse(json.dumps(response_data), content_type='application/javascript')
-        else:
-            messages.error(request, 'Invalid form data. Please check the input.')
-    else:
-        form = CancelReasonsForm()
+            return render(request, self.template_name, context)
+        except Customers.DoesNotExist:
+            messages.error(request, "Guest customer not found.")
+            return redirect('guest_customers')
+        
+        
+class ApproveGuestOrder(View):
+    def get(self, request, order_id, *args, **kwargs):
+        guest_order = get_object_or_404(GuestCustomerOrder, id=order_id)
+        customer = guest_order.customer
 
-    context = {
-        'form': form,
-        'is_cancel_reasons_page': True,
-    }
+        try:
+            product_item = ProdutItemMaster.objects.get(product_name="5 Gallon")
+            emergency_order = DiffBottlesModel.objects.create(
+                customer=customer,
+                product_item=product_item,
+                quantity_required=guest_order.no_bottles_required,
+                delivery_date=datetime.now().date(), 
+                assign_this_to=customer.sales_staff,
+                status="pending"
+            )
 
-    return render(request, 'customer_care/cancel_reasons/create.html', context)
+            if customer.sales_staff:
+                salesman_body = f"Emergency order approved for {customer.customer_name}"
+                notification(customer.sales_staff.pk, "Emergency Order", salesman_body, "sanawater")
+                notification(customer.user_id.pk, "Emergency Order", "Your emergency order has been approved.", "sanawater")
 
+            messages.success(request, f"Emergency order created for {customer.customer_name}.", 'alert-success')
+        except Exception as e:
+            messages.error(request, f"Error creating emergency order: {e}", 'alert-danger')
 
-def edit_cancel_reason(request, pk):
-    instance = get_object_or_404(CancelReasons, pk=pk)
-
-    if request.method == 'POST':
-        form = CancelReasonsForm(request.POST, instance=instance)
-        if form.is_valid():
-            data = form.save(commit=False)
-            data.modified_by = str(request.user.id)
-            data.modified_date = datetime.now()
-            data.save()
-
-            response_data = {
-                "status": "true",
-                "title": "Successfully Updated",
-                "message": "Cancel reason updated successfully.",
-                "redirect": "true",
-                "redirect_url": reverse('cancel_reasons'),
-            }
-            return HttpResponse(json.dumps(response_data), content_type='application/javascript')
-    else:
-        form = CancelReasonsForm(instance=instance)
-
-    context = {
-        'form': form,
-        'is_cancel_reasons_page': True,
-    }
-    return render(request, 'customer_care/cancel_reasons/create.html', context)
-
-
-def delete_cancel_reason(request, pk):
-    instance = get_object_or_404(CancelReasons, pk=pk)
-    instance.delete()
-
-    response_data = {
-        "status": "true",
-        "title": "Successfully Deleted",
-        "message": "Cancel reason deleted successfully.",
-        "redirect": "true",
-        "redirect_url": reverse('cancel_reasons'),
-    }
-
-    return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+        return redirect('guest_customers')

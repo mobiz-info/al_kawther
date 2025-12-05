@@ -47,12 +47,9 @@ path('customer_requesttype_create',CustomerRequestType_Create.as_view(), name='c
 path('customer_requesttype_edit/<str:pk>', CustomerRequestType_Edit.as_view(), name='customer_requesttype_edit'),
 path('customer_requesttype_delete/<uuid:pk>/', CustomerRequestType_Delete.as_view(), name='customer_requesttype_delete'),
 
-
-path('cancel-reasons/', cancel_reasons, name='cancel_reasons'),
-path('create-cancel-reason/', create_cancel_reason, name='create_cancel_reason'),
-path('edit-cancel-reason/<uuid:pk>/', edit_cancel_reason, name='edit_cancel_reason'),
-path('delete-cancel-reason/<uuid:pk>/', delete_cancel_reason, name='delete_cancel_reason'),
-
-
+path("guest-customers/", GuestCustomerList.as_view(), name="guest_customers"),
+path("assign-to-customer/<str:pk>/", EditGuestCustomerView.as_view(), name="assign_to_customer"),
+path('guest-customer-orders/<uuid:customer_id>/', GuestCustomerOrders.as_view(), name='guest_customer_orders'),
+path('approve-guest-order/<uuid:order_id>/', ApproveGuestOrder.as_view(), name='approve_guest_order'),
 
 ]

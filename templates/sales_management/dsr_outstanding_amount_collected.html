@@ -7,7 +7,7 @@
 <div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between">
     <h4 class="fw-medium mb-0">Outstanding Amount Collected Report</h4>
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-30">Reports</a></li>
+        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-30">Sales Management</a></li>
         <li class="breadcrumb-item active" aria-current="page">Outstanding Amount Collected Report</li>
     </ol>
 </div>
@@ -78,7 +78,6 @@
                                     <thead>
                                         <tr>
                                             <th style="text-align:center;" scope="col">Sl.no</th>
-                                            <th style="text-align:center;" scope="col">Customer ID</th>
                                             <th style="text-align:center;" scope="col">Customer Name</th>
                                             <th style="text-align:center;" scope="col">Building Name/Room no</th>
                                             <th style="text-align:center;" scope="col">Customer Type</th>
@@ -90,7 +89,6 @@
                                         {% for instance in dialy_collections %}
                                         <tr>
                                             <td style="text-align:center;">{{ forloop.counter }}</td>
-                                            <td>{{ instance.customer.custom_id }}</td>
                                             <td>{{ instance.customer.customer_name }}</td>
                                             <td>{{ instance.customer.building_name }} {% if instance.customer.door_house_no %} / {{ instance.customer.door_house_no }} {% endif %}</td>
                                             <td style="text-align:center;">{{ instance.customer.customer_type }}</td>
@@ -99,13 +97,14 @@
                                         </tr>
                                     {% endfor %} 
                                     </tbody>
-                                    <tfoot>
+                                    {% comment %} <tfoot>
                                         <tr>
-                                            <td colspan="5" style="text-align:right;"><strong>Total:</strong></td>
-                                            <td style="text-align:center;"><strong>{{ outstanding_total_amount_collected }}</strong></td>
-                                            <td></td>
+                                            <td colspan="4" style="text-align: right;">Total:</td>
+                                            
+                                            <td style="text-align:center;">{{ outstanding_total_amount_collected }}</td>
+                                            <td style="text-align:center;"></td>
                                         </tr>
-                                    </tfoot>
+                                    </tfoot> {% endcomment %}
                                 </table>
                             </div>
                         </div>

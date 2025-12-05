@@ -1,8 +1,10 @@
 import uuid
 import json
 import base64
-import qrcode
 import datetime
+import qrcode
+from io import BytesIO
+import base64
 
 from django.utils import timezone
 from django.shortcuts import render
@@ -20,6 +22,7 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.urls import reverse
+from django.db import transaction, IntegrityError
 from django.contrib.auth.hashers import is_password_usable
 
 from competitor_analysis.forms import CompetitorAnalysisFilterForm
@@ -29,7 +32,6 @@ from .forms import *
 from .models import *
 from django.db.models import Q
 import pandas as pd
-from io import BytesIO
 from reportlab.pdfgen import canvas
 from datetime import datetime, timedelta
 from client_management.models import *
@@ -37,26 +39,38 @@ from django.db.models import Q, Sum, Count
 from customer_care.models import *
 from van_management.models import Van_Routes,Van,VanProductStock
 
-from dal import autocomplete
-
 from django.contrib.auth import update_session_auth_hash
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import CustomPasswordChangeForm
 
 # Create your views here.
+@csrf_exempt
+def move_schedule_view(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        date = data.get('date')
+        customers = data.get('customers')
+        
+        for customer_id in customers:
+            customer_instance = Customers.objects.get(pk=customer_id)
+            product_instance = ProdutItemMaster.objects.get(product_name="5 Gallon")
+            
+            if not DiffBottlesModel.objects.filter(product_item=product_instance,customer=customer_instance,delivery_date=date).exists():
+                DiffBottlesModel.objects.create(
+                    product_item=product_instance,
+                    quantity_required=customer_instance.no_of_bottles_required,
+                    delivery_date=date,
+                    assign_this_to=customer_instance.sales_staff,
+                    mode="paid",
+                    amount=customer_instance.no_of_bottles_required * customer_instance.get_water_rate(),
+                    discount_net_total=customer_instance.no_of_bottles_required * customer_instance.get_water_rate(),
+                    created_by=request.user.id,
+                    created_date=datetime.today(),
+                    customer=customer_instance,
+                )
 
-class SalesmanAutocomplete(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = CustomUser.objects.filter(user_type__in=["Salesman"]) 
-
-        if self.q:
-            qs = qs.filter(
-                Q(first_name__istartswith=self.q) |
-                Q(last_name__istartswith=self.q) |
-                Q(phone__icontains=self.q)
-            )
-
-        return qs
+        return JsonResponse({'status': 'success'})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
     
 
 def user_login(request):
@@ -290,7 +304,7 @@ class User_Delete(View):
 #             # Filter the queryset based on the form data
 #         route_filter = request.GET.get('route_name')
 #         if route_filter :
-#             user_li = Customers.objects.filter(routes__route_name=route_filter)
+#             user_li = Customers.objects.filter(is_guest=False, routes__route_name=route_filter)
 #         # else:
 #         #         user_li = Customers.objects.all()
 #         # else:
@@ -362,9 +376,11 @@ class Customer_List(View):
         customer_type_filter = request.GET.get('customer_type')
         non_visit_reason = request.GET.get('non_visited_reason')
         created_date_filter = request.GET.get('created_date')
+        location_filter = request.GET.get('location')  
+        status_filter = request.GET.get('status')
 
         # Start with all customers
-        user_li = Customers.objects.filter(is_deleted=False).select_related('location', 'routes')
+        user_li = Customers.objects.filter(is_guest=False, is_deleted=False).select_related('location', 'routes')
 
         # Apply filters
         if query:
@@ -372,6 +388,7 @@ class Customer_List(View):
                 Q(custom_id__icontains=query) |
                 Q(customer_name__icontains=query) |
                 Q(mobile_no__icontains=query) |
+                Q(whats_app__icontains=query) |
                 Q(location__location_name__icontains=query) |
                 Q(building_name__icontains=query)
             )
@@ -399,11 +416,25 @@ class Customer_List(View):
             user_li = user_li.filter(customer_id__in=customer_ids)
             filter_data['non_visit_reason'] = non_visit_reason
 
-        # Get route and non-visit reason lists
+        if location_filter:
+            user_li = user_li.filter(location__location_id=location_filter)
+            filter_data['location'] = location_filter
+
+        if status_filter:
+            if status_filter == "active":
+                user_li = user_li.filter(is_active=True)
+            elif status_filter == "inactive":
+                user_li = user_li.filter(is_active=False)
+            filter_data['status'] = status_filter
+        else:
+            # default to active customers
+            user_li = user_li.filter(is_active=True)
+            
+        # Get dropdown lists
         route_li = RouteMaster.objects.all()
         non_visit_reasons = NonVisitReason.objects.all()
+        locations = LocationMaster.objects.all()  
 
-        # Log activity
         log_activity(
             created_by=request.user, 
             description=f"Viewed customer list with filters: {filter_data}"
@@ -416,6 +447,8 @@ class Customer_List(View):
             'q': query,
             'filter_data': filter_data,
             'non_visit_reasons': non_visit_reasons,
+            'locations': locations, 
+            'status_filter': status_filter,
         }
 
         return render(request, self.template_name, context)
@@ -496,11 +529,11 @@ class Customer_List(View):
 
 
     #     return render(request, self.template_name, context)
-    
+
 def print_multiple_qrs(request):
     if request.method == 'POST':
         customer_ids = request.POST.getlist('customer_ids')
-        customers = Customers.objects.filter(pk__in=customer_ids)
+        customers = Customers.objects.filter(is_guest=False, pk__in=customer_ids)
 
         qr_data_list = []
         for customer in customers:
@@ -518,7 +551,6 @@ def print_multiple_qrs(request):
 
         return render(request, 'accounts/print_qr_multiple.html', {'qr_data_list': qr_data_list})
 
-
 class Latest_Customer_List(View):
     template_name = 'accounts/latest_customer_list.html'
 
@@ -530,7 +562,7 @@ class Latest_Customer_List(View):
         customer_type_filter = request.GET.get('customer_type')
 
         ten_days_ago = datetime.now() - timedelta(days=10)
-        user_li = Customers.objects.filter(created_date__gte=ten_days_ago,is_deleted=False)
+        user_li = Customers.objects.filter(is_guest=False, created_date__gte=ten_days_ago,is_deleted=False)
         
         if request.GET.get('start_date'):
             start_date = request.GET.get('start_date')
@@ -617,7 +649,7 @@ class Inactive_Customer_List(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
 
-                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False)
+                route_customers = Customers.objects.filter(is_guest=False, routes=van_route.routes,is_deleted=False,is_active=True)
                 
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
                 todays_customer_ids = {customer['customer_id'] for customer in todays_customers}
@@ -626,11 +658,9 @@ class Inactive_Customer_List(View):
 
         if query:
             inactive_customers = inactive_customers.filter(
-                custom_id__icontains=query
-            ) | inactive_customers.filter(
-                customer_name__icontains=query
-            ) | inactive_customers.filter(
-                building_name__icontains=query
+                Q(custom_id__icontains=query) |
+                Q(customer_name__icontains=query) |
+                Q(building_name__icontains=query)
             )
             filter_data['q'] = query
 
@@ -721,7 +751,7 @@ class PrintInactiveCustomerList(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
                 
-                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False)
+                route_customers = Customers.objects.filter(is_guest=False, routes=van_route.routes,is_deleted=False,is_active=True)
                 
                 # Ensure `todays_customers` is an empty list if `find_customers` returns None
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
@@ -806,74 +836,83 @@ def create_customer(request):
     template_name = 'accounts/create_customer.html'
     form = CustomercreateForm(branch)
     context = {"form":form}
-    try:
-        if request.method == 'POST':
-            form = CustomercreateForm(branch,data = request.POST)
-            context = {"form":form}
-            if form.is_valid():
-                mobile_no = form.cleaned_data.get("mobile_no")
-                customer_name = form.cleaned_data.get("customer_name")
+    
+    if request.method == 'POST':
+        try:
+            with transaction.atomic():
+                form = CustomercreateForm(branch,data = request.POST)
+                context = {"form":form}
+                if form.is_valid():
+                    mobile_no = form.cleaned_data.get("mobile_no")
+                    customer_name = form.cleaned_data.get("customer_name")
 
-                if mobile_no:
-                    hashed_password = make_password(mobile_no)
+                    if mobile_no:
+                        hashed_password = make_password(mobile_no)
 
-                    customer_user_data = CustomUser.objects.create(
-                        password=hashed_password,
-                        username=mobile_no,
-                        first_name=customer_name,
-                        user_type='Customer'
-                    )
-                
-                data = form.save(commit=False)
-                data.created_by = str(request.user)
-                data.created_date = datetime.now()
-                data.emirate = data.location.emirate
-                branch_id = request.user.branch_id.branch_id
-                branch = BranchMaster.objects.get(branch_id=branch_id)
-                data.branch_id = branch
-                data.custom_id = get_custom_id(Customers)
-                if mobile_no:
-                    data.user_id = customer_user_data
-                data.save()
-                Staff_Day_of_Visit.objects.create(customer = data)
-                
-                if data.no_of_bottles_required > 0:
-                    custody_instance = CustodyCustom.objects.create(
-                        customer=data,
-                        created_by=request.user.id,
-                        created_date=datetime.today(),
-                        deposit_type="non_deposit",
-                        reference_no=f"{data.custom_id} - {data.created_date}"
-                    )
-
-                    CustodyCustomItems.objects.create(
-                        product=ProdutItemMaster.objects.get(product_name="5 Gallon"),
-                        quantity=data.no_of_bottles_required,
-                        custody_custom=custody_instance
+                        customer_user_data = CustomUser.objects.create(
+                            password=hashed_password,
+                            username=mobile_no,
+                            first_name=customer_name,
+                            user_type='Customer'
+                        )
+                    
+                    data = form.save(commit=False)
+                    data.created_by = str(request.user)
+                    data.created_date = datetime.now()
+                    data.emirate = data.location.emirate
+                    branch_id = request.user.branch_id.branch_id
+                    branch = BranchMaster.objects.get(branch_id=branch_id)
+                    data.branch_id = branch
+                    data.custom_id = get_custom_id(Customers)
+                    if mobile_no:
+                        data.user_id = customer_user_data
+                    data.save()
+                    Staff_Day_of_Visit.objects.create(customer = data)
+                    
+                    log_activity(
+                        created_by=request.user,
+                        description=f"Created customer {data.custom_id} - {data.customer_name}"
                     )
                     
-                    custody_stock, created = CustomerCustodyStock.objects.get_or_create(
-                        customer=data,
-                        product=ProdutItemMaster.objects.get(product_name="5 Gallon"),
-                    )
-                    custody_stock.reference_no = f"{data.custom_id} - {data.created_date}"   
-                    custody_stock.quantity += data.no_of_bottles_required
-                    custody_stock.save()
-                
-                log_activity(
-                    created_by=request.user,
-                    description=f"Created customer {data.custom_id} - {data.customer_name}"
-                )
-                
-                messages.success(request, 'Customer Created successfully!')
-                return redirect('customers')
-            else:
-                messages.success(request, 'Invalid form data. Please check the input.')
-                return render(request, template_name,context)
-        return render(request, template_name,context)
-    except Exception as e:
-        message = f'Something went wrong {e}'
-        messages.success(request, message)
+                    response_data = {
+                        "status": "true",
+                        "title": "Successfully Created",
+                        "message": "Customer Created successfully.",
+                        'redirect': 'true',
+                        "redirect_url": reverse('customers')
+                    }
+                    
+                else:
+                    message = generate_form_errors(form, formset=False)
+                    
+                    response_data = {
+                    "status": "false",
+                    "title": "Failed",
+                    "message": message,
+                    }
+                    
+        except IntegrityError as e:
+            log_activity(
+                created_by=request.user,
+                description=f"IntegrityError while creating customer {str(e)}"
+            )
+            # Handle database integrity error
+            response_data = {
+                "status": "false",
+                "title": "Failed",
+                "message": str(e),
+            }
+
+        except Exception as e:
+            # Handle other exceptions
+            response_data = {
+                "status": "false",
+                "title": "Failed",
+                "message": str(e),
+            }
+        return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+    
+    else:
         return render(request, template_name,context)
         
 def load_locations(request):
@@ -909,25 +948,26 @@ class Customer_Details(View):
     def format_visit_schedule(self, visit_schedule):
         week_schedule = {}
         no_week_days = []
-
-        for day, weeks in visit_schedule.items():
-            if weeks == ['']:
-                no_week_days.append(day)
-            else:
-                for week in weeks:
-                    if week not in week_schedule:
-                        week_schedule[week] = []
-                    week_schedule[week].append(day)
-        
         formatted_schedule = []
         
-        if no_week_days:
-            days = ', '.join(no_week_days)
-            formatted_schedule.append(f"General: {days}")
-        
-        for week in sorted(week_schedule.keys(), reverse=True):
-            days = ', '.join(week_schedule[week])
-            formatted_schedule.append(f"{week}: {days}")
+        if visit_schedule:
+            for day, weeks in visit_schedule.items():
+                if weeks == ['']:
+                    no_week_days.append(day)
+                else:
+                    for week in weeks:
+                        if week not in week_schedule:
+                            week_schedule[week] = []
+                        week_schedule[week].append(day)
+            
+            
+            if no_week_days:
+                days = ', '.join(no_week_days)
+                formatted_schedule.append(f"General: {days}")
+            
+            for week in sorted(week_schedule.keys(), reverse=True):
+                days = ', '.join(week_schedule[week])
+                formatted_schedule.append(f"{week}: {days}")
         return formatted_schedule
 
 def edit_customer(request,pk):
@@ -1037,10 +1077,11 @@ from accounts.templatetags.accounts_templatetags import get_next_visit_day
 def customer_list_excel(request):
     query = request.GET.get("q")
     route_filter = request.GET.get('route_name')
-    user_li = Customers.objects.all().filter(is_deleted=False)
 
-    # Apply filters if they exist
-    if query and query != '' and query != 'None':
+    # Optimize by selecting only required fields
+    user_li = Customers.objects.filter(is_guest=False, is_deleted=False).select_related('routes', 'location')
+
+    if query and query not in ('', 'None'):
         user_li = user_li.filter(
             Q(custom_id__icontains=query) |
             Q(customer_name__icontains=query) |
@@ -1049,14 +1090,27 @@ def customer_list_excel(request):
             Q(location__location_name__icontains=query) |
             Q(building_name__icontains=query)
         )
-    
-    print('route_filter :', route_filter)
-    if route_filter and route_filter != '' and route_filter != 'None':
+
+    if route_filter and route_filter not in ('', 'None'):
         user_li = user_li.filter(routes__route_name=route_filter)
 
-    # Get all route names for the dropdown
-    route_li = RouteMaster.objects.all()
+    # Prefetch related data to reduce queries in loop
+    custody_stock_data = {
+        cs.customer_id: cs.quantity
+        for cs in CustomerCustodyStock.objects.filter(product__product_name="5 Gallon")
+    }
     
+    outstanding_bottle_data = {
+        co.customer_id: co.value
+        for co in CustomerOutstandingReport.objects.filter(product_type="emptycan")
+    }
+
+    last_supplied_data = {
+        ls.customer_supply.customer_id: ls.quantity
+        for ls in CustomerSupplyItems.objects.select_related('customer_supply')
+        .order_by('-customer_supply__created_date')
+    }
+
     data = {
         'Serial Number': [],
         'Customer ID': [],
@@ -1067,26 +1121,20 @@ def customer_list_excel(request):
         'Building Name': [],
         'House No': [],
         'Bottles stock': [],
-        'Next Visit date': [],  # Create an empty list for next visit dates
+        'Next Visit date': [],
         'Sales Type': [],
         'Rate': [],
     }
 
     for serial_number, customer in enumerate(user_li, start=1):
         next_visit_date = get_next_visit_day(customer.pk)
-        custody_count = 0
-        outstanding_bottle_count = 0
 
-        if (custody_stock:=CustomerCustodyStock.objects.filter(customer=customer,product__product_name="5 Gallon")).exists() :
-            custody_count = custody_stock.first().quantity 
+        custody_count = custody_stock_data.get(customer.pk, 0)
+        outstanding_bottle_count = outstanding_bottle_data.get(customer.pk, 0)
+        last_supplied_count = last_supplied_data.get(customer.pk, 0)
 
-        if (outstanding_count:=CustomerOutstandingReport.objects.filter(customer=customer,product_type="emptycan")).exists() :
-            outstanding_bottle_count = outstanding_count.first().value
+        total_bottle_count = custody_count + outstanding_bottle_count + last_supplied_count
 
-        last_supplied_count = CustomerSupplyItems.objects.filter(customer_supply__customer=customer).order_by('-customer_supply__created_date').values_list('quantity', flat=True).first() or 0
-
-        total_bottle_count = custody_count + outstanding_bottle_count + last_supplied_count 
-        print("final_bottle_count",total_bottle_count)
         data['Serial Number'].append(serial_number)
         data['Customer ID'].append(customer.custom_id)
         data['Customer name'].append(customer.customer_name)
@@ -1102,33 +1150,31 @@ def customer_list_excel(request):
 
     df = pd.DataFrame(data)
 
-    # Excel writing code...
-
+    # Excel writing optimization
     buffer = BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, sheet_name='Sheet1', index=False, startrow=4)
         workbook = writer.book
         worksheet = writer.sheets['Sheet1']
-        table_border_format = workbook.add_format({'border':1})
-        worksheet.conditional_format(4, 0, len(df.index)+4, len(df.columns) - 1, {'type':'cell', 'criteria': '>', 'value':0, 'format':table_border_format})
+        table_border_format = workbook.add_format({'border': 1})
+        worksheet.conditional_format(4, 0, len(df.index) + 4, len(df.columns) - 1, 
+                                     {'type': 'cell', 'criteria': '>', 'value': 0, 'format': table_border_format})
+        
         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 16, 'border': 1})
-        worksheet.merge_range('A1:L2', f'Al Kawthar Pure Drinking Water', merge_format)
+        worksheet.merge_range('A1:L2', f'Sana Water', merge_format)
         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
         worksheet.merge_range('A3:L3', f'    Customer List   ', merge_format)
-        # worksheet.merge_range('E3:H3', f'Date: {def_date}', merge_format)
-        # worksheet.merge_range('I3:M3', f'Total bottle: {total_bottle}', merge_format)
-        merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
         worksheet.merge_range('A4:L4', '', merge_format)
-    
-    filename = f"Customer List.xlsx"
+
+    filename = "Customer List.xlsx"
     response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'inline; filename = "{filename}"'
-    
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+
     log_activity(
         created_by=request.user,
         description="Generated and downloaded customer list Excel report"
     )
-    
+
     return response
 
 # def visit_days_assign(request,customer_id):
@@ -1395,30 +1441,6 @@ class OtherProductRateChangeView(View):
             "redirect_url": reverse('customer_rate_history', kwargs={'pk': pk})
         }
         return JsonResponse(response_data)
-    
-def add_cancel_reason(request, customer_id):
-
-    customer = get_object_or_404(Customers, customer_id=customer_id)
-
-    if request.method == "POST":
-
-        form = CustomerCancelledReasonForm(request.POST)
-        if form.is_valid():
-
-            cancel_reason = form.save(commit=False)
-            cancel_reason.customer = customer
-            cancel_reason.save()
-
-            # customer.is_cancelled = True
-            customer.save()
-
-            return redirect('customers')
-
-
-    else:
-        form = CustomerCancelledReasonForm()
-
-    return render(request, 'accounts/add_cancel_reason.html', {'form': form, 'customer': customer})
 
 def customer_username_change(request, customer_id):
     customer = get_object_or_404(Customers, customer_id=customer_id)
@@ -1495,6 +1517,7 @@ def customer_password_change(request, customer_id):
         "customer": customer,
         "has_password": has_password
     })
+
 class NonVisitedCustomersView(View):
     template_name = 'accounts/non_visited_customers.html'
     paginate_by = 50  # Optional: For pagination, you can set this value
@@ -1523,7 +1546,9 @@ class NonVisitedCustomersView(View):
 
                 # Actual visit
                 visited_customers = CustomerSupply.objects.filter(salesman_id=salesman_id, created_date__date=date)
-                todays_customers = find_customers(request, str(date), van_route.routes.pk)
+                todays_customers = find_customers(request, str(date), van_route.routes.pk) or []
+
+                # todays_customers = find_customers(request, str(date), van_route.routes.pk)
                 # # Convert each dictionary to a tuple of items for hashing
                 # planned_visit = set(tuple(customer.items()) for customer in todays_customers)
                 # visited = set(visited_customers.values_list('customer_id', flat=True))
@@ -1591,60 +1616,70 @@ class MissingCustomersView(View):
     template_name = 'accounts/missing_customers.html'
 
     def get(self, request, *args, **kwargs):
-        date = datetime.now().date()  # Or pass this as an argument if needed
+        filter_data = {}
+        request_date = request.GET.get('date')
+        
+        if request_date:
+            request_date = datetime.strptime(request_date, '%Y-%m-%d').date()
+            filter_data['filter_date'] = request_date.strftime('%Y-%m-%d')
+        else:
+            request_date = datetime.now().date()
+            filter_data['filter_date'] = request_date.strftime('%Y-%m-%d')
 
         routes = RouteMaster.objects.all()  # Get all RouteMaster instances
-        route_data = []
+        # route_data = []
 
-        for route in routes:
-            route_id = route.route_id  # Use route_id from RouteMaster
-            actual_visitors = Customers.objects.filter(routes__pk=route_id, is_active=True).count()
+        # for route in routes:
+        #     route_id = route.route_id  # Use route_id from RouteMaster
+        #     actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
 
-            planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
-            planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
+        #     planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
+        #     planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
 
-            supplied_customers = CustomerSupply.objects.filter(
-                customer__routes__pk=route_id,
-                created_date__date=date
-            ).count()
+        #     supplied_customers = CustomerSupply.objects.filter(
+        #         customer__routes__pk=route_id,
+        #         created_date__date=date
+        #     ).count()
 
-            if isinstance(planned_visitors_list, list):
-                todays_customers_dict = planned_visitors_list
-            else:
-                todays_customers_dict = []
+        #     if isinstance(planned_visitors_list, list):
+        #         todays_customers_dict = planned_visitors_list
+        #     else:
+        #         todays_customers_dict = []
 
-            visited_customers_ids = set(
-                CustomerSupply.objects.filter(
-                    customer__routes__pk=route_id,
-                    created_date__date=date
-                ).values_list('customer_id', flat=True)
-            )
+        #     visited_customers_ids = set(
+        #         CustomerSupply.objects.filter(
+        #             customer__routes__pk=route_id,
+        #             created_date__date=date
+        #         ).values_list('customer_id', flat=True)
+        #     )
 
-            # Filter out visited customers
-            missed_customers = [
-                customer for customer in todays_customers_dict 
-                if customer['customer_id'] not in visited_customers_ids
-            ]
+        #     # Filter out visited customers
+        #     missed_customers = [
+        #         customer for customer in todays_customers_dict 
+        #         if customer['customer_id'] not in visited_customers_ids
+        #     ]
 
-            missed_customers_count = len(missed_customers)
-            print("missed_customers_count", missed_customers_count)
+        #     missed_customers_count = len(missed_customers)
+        #     # print("missed_customers_count", missed_customers_count)
 
-            route_data.append({
-                'route_name': route.route_name,  
-                'actual_visitors': actual_visitors,
-                'planned_visitors': planned_visitors,
-                'missed_customers': missed_customers_count,
-                'supplied_customers': supplied_customers,
-                'route_id': route.route_id  
-            })
+            # route_data.append({
+            #     'route_name': route.route_name,  
+            #     'actual_visitors': actual_visitors,
+            #     'planned_visitors': planned_visitors,
+            #     'missed_customers': missed_customers_count,
+            #     'supplied_customers': supplied_customers,
+            #     'route_id': route.route_id  
+            # })
 
-        log_activity(
-                created_by=request.user.username, 
-                description=f"Processed route: {route.route_name}. Missed customers count: {missed_customers_count}"
-            )
+        # log_activity(
+        #         created_by=request.user.username, 
+        #         description=f"Processed route: {route.route_name}. Missed customers count: {missed_customers_count}"
+        #     )
         
         context = {
-            'route_data': route_data
+            'route_data': routes,
+            'filter_data': filter_data,
+            'request_date': request_date
         }
 
         return render(request, self.template_name, context)
@@ -1660,7 +1695,7 @@ class MissingCustomersPdfView(View):
 
         for route in routes:
             route_id = route.route_id
-            actual_visitors = Customers.objects.filter(routes__pk=route_id, is_active=True).count()
+            actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
 
             planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
             planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
@@ -1714,29 +1749,40 @@ class MissedOnDeliveryView(View):
     template_name = 'accounts/missed_on_delivery.html'
 
     def get(self, request, route_id, *args, **kwargs):
-        date = timezone.now().date()
-        van_route = get_object_or_404(Van_Routes, routes__route_id=route_id)
-        print("van_route",van_route)
-        planned_customers = find_customers(request, str(date), route_id)
+        filter_data = {}
+        request_date_str = request.GET.get('request_date')
+
+        if request_date_str:
+            # try:
+            request_date = datetime.strptime(request_date_str, '%Y-%m-%d').date()
+            # except ValueError:
+                # request_date = datetime.now().date()
+        else:
+            request_date = datetime.now().date()
+
+        filter_data['filter_date'] = request_date.strftime('%Y-%m-%d')
+        
+        planned_customers = find_customers(request, str(request_date), route_id) or []
 
         supplied_customers_ids = CustomerSupply.objects.filter(
             customer__routes__route_id=route_id,
-            created_date__date=date
+            created_date__date=request_date
         ).values_list('customer_id', flat=True)
 
         missed_customers = []
         for customer in planned_customers:
             if customer['customer_id'] not in supplied_customers_ids:
-                last_supply = CustomerSupply.objects.filter(
-                    customer_id=customer['customer_id']
-                ).order_by('-created_date').last()
+                if (last_supply_instances:=CustomerSupply.objects.filter(customer_id=customer['customer_id'])).exists():
+                    last_supply = last_supply_instances.latest('-created_date')
 
-                last_sold_date = last_supply.created_date if last_supply else None
+                    last_sold_date = last_supply.created_date if last_supply else None
+                else:
+                    last_sold_date = None
 
                 # Get the reason for non-visit if exists
                 non_visit_report = NonvisitReport.objects.filter(
                     customer_id=customer['customer_id'],
-                    supply_date=date
+                    supply_date=request_date
                 ).last()
 
                 reason_for_non_visit = non_visit_report.reason if non_visit_report else None
@@ -1747,8 +1793,8 @@ class MissedOnDeliveryView(View):
 
         log_activity(
                     created_by=request.user.username,
-                    description=f"Missed customer ID: {customer['customer_id']} for route ID: {route_id} on date: {date}. Last sold date: {last_sold_date}, Reason: {reason_for_non_visit}"
-                )
+                    description=f"Missed Page for route ID: {route_id} on date: {date}."
+                    )                   
         
         context = {
             'missed_customers': missed_customers,
@@ -1765,7 +1811,7 @@ class MissedOnDeliveryPrintView(View):
     
     def get(self, request, route_id, *args, **kwargs):
         date = timezone.now().date()
-        van_route = get_object_or_404(Van_Routes, routes__route_id=route_id)
+        route = get_object_or_404(RouteMaster, route_id=route_id)
 
         planned_customers = find_customers(request, str(date), route_id)
 
@@ -1842,10 +1888,10 @@ class Gps_Route_List(View):
 def activate_gps_for_route(request, route_id):
     route = get_object_or_404(RouteMaster, route_id=route_id)
     
-    gps_active = Customers.objects.filter(routes=route, gps_module_active=True).exists()
+    gps_active = Customers.objects.filter(is_guest=False, routes=route, gps_module_active=True).exists()
     
     if gps_active:
-        Customers.objects.filter(routes=route).update(gps_module_active=False)
+        Customers.objects.filter(is_guest=False, routes=route).update(gps_module_active=False)
 
         GpsLog.objects.filter(route=route, gps_enabled=True, turn_off_time__isnull=True).update(turn_off_time=now())
 
@@ -1860,7 +1906,7 @@ def activate_gps_for_route(request, route_id):
         messages.success(request, f"GPS Lock disabled for all customers in route: {route.route_name}")
 
     else:
-        Customers.objects.filter(routes=route).update(gps_module_active=True)
+        Customers.objects.filter(is_guest=False, routes=route).update(gps_module_active=True)
 
         GpsLog.objects.create(
             route=route,
@@ -1883,20 +1929,3 @@ def gps_lock_view(request, route_id):
         "gps_logs": gps_logs
     }
     return render(request, "accounts/gps_log_view.html", context)
-
-def cancelled_customers_list(request):
-    cancelled_customers = CustomerIscancelledReasons.objects.filter().order_by('-created_date')
-    return render(request, 'accounts/cancelled_customers_list.html', {'cancelled_customers': cancelled_customers})
-
-def undo_cancel_customer_confirm(request, customer_id):
-    customer = get_object_or_404(Customers, customer_id=customer_id)
-    return render(request, "accounts/undo_cancel_confirm.html", {"customer": customer})
-
-def undo_cancel_customer(request, customer_id):
-    if request.method == "POST":
-        customer = get_object_or_404(Customers, customer_id=customer_id)
-        # customer.is_cancelled = False
-        customer.save() 
-        return redirect("cancelled_customers")
-    
-    return JsonResponse({"status": "false", "message": "Invalid request! Must be a POST request."}, status=400)

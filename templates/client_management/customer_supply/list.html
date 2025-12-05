@@ -6,7 +6,7 @@
 <div class="page-header-breadcrumb d-md-flex d-block align-items-center justify-content-between ">
     <h4 class="fw-medium mb-0">Supply List</h4>
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Client Management</a>
+        <li class="breadcrumb-item"><a href="javascript:void(0);" class="text-white-50">Dashboard</a>
         </li>
         <li class="breadcrumb-item active" aria-current="page">Supply List</li>
     </ol>
@@ -42,6 +42,7 @@
                                         <label for="end_date">To Date:</label>
                                         <input type="date" class="form-control" id="end_date" name="end_date" value="{{ filter_data.end_date|date:'Y-m-d' }}">
                                     </div>
+                                    
                                     <div class="col">
                                         <label for="route_name">Routes:</label>
                                         <select name="route_name" class="form-select">
@@ -54,6 +55,14 @@
                                     <div class="col">
                                         <label for="route_name">Search:</label>
                                         <input type="text" name="q" class="form-control" placeholder="Search ..." value="{{ filter_data.q }}">
+                                    </div>
+                                    <div class="col">
+                                        <label for="supply_type">Supply Type:</label>
+                                        <select name="supply_type" class="form-select">
+                                            <option value="">All</option>
+                                            <option value="Paid" {% if filter_data.supply_type == "Paid" %}selected{% endif %}>Paid</option>
+                                            <option value="Non Paid" {% if filter_data.supply_type == "Non Paid" %}selected{% endif %}>Non Paid</option>
+                                        </select>
                                     </div>
                                     <div class="col d-flex align-items-end justify-content-end">
                                         <input type="submit" class="btn btn-primary btn-sm mx-1" value="Apply Filter">
@@ -73,6 +82,7 @@
                                     <label for="end_date" class="col-form-label text-end me-2">End:</label>
                                     <input name="end_date" type="date" class="form-select" style="width: 50%;" value="{{ filter_data.end_date|date:'Y-m-d' }}">
                                 </div>
+                    
                                 <!-- Route Selection -->
                                 <div class="col-4 d-flex align-items-center">
                                     <label for="route_name" class="col-form-label text-end me-2">Route:</label>
@@ -83,6 +93,7 @@
                                         {% endfor %}
                                     </select>
                                 </div>
+                    
                                 <!-- Search and Buttons -->
                                 <div class="col-4 d-flex align-items-center justify-content-end">
                                     <input type="text" name="q" class="form-control me-2" placeholder="Search ..." value="{{ filter_data.q }}">
@@ -92,6 +103,7 @@
                             </div>
                         </form>
                     </div> {% endcomment %}
+                    
                     <div class="card-body" style="overflow: auto;">
                         <table class="table table-bordered text-nowrap" style="width:100%">
                             <thead>
@@ -103,14 +115,10 @@
                                 <th scope="col" class="text-left">Customer Name</th>
                                 <th scope="col" class="text-left">Customer Type</th>
                                 <th scope="col" class="text-left">Salesman Name</th>
-                                <th scope="col" class="text-center">Supply</th>
-                                <th scope="col" class="text-center">Allowed to Pending</th>
-                                <th scope="col" class="text-center">Allowed to Custody</th>
-                                <th scope="col" class="text-center">Allowed to Paid</th>
+                                <th scope="col" class="text-center">Total Supply</th>
                                 <th scope="col" class="text-center">FOC</th>
                                 <th scope="col" class="text-center">Collected</th>
                                 <th scope="col" class="text-center">Supply Type</th>
-                                <th scope="col" class="text-center">Payment Mode</th>
                                 {% comment %} <th scope="col" class="text-center">Discount</th>
                                 <th scope="col" class="text-center">Sub Total</th>
                                 <th scope="col" class="text-center">Amount Recieved</th> {% endcomment %}
@@ -120,65 +128,44 @@
                             <tbody>
                                 {% load el_pagination_tags %}
                                 {% paginate 20 instances %}
-                                {% if instances %}
-                                    {% for instance in instances %}
-                                    <tr>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{forloop.counter}}</td>
-                                        <td class="text-left" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.created_date}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.invoice_no}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.customer.custom_id}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.customer.customer_name}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.get_supply_type}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.salesman.get_fullname}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.get_total_supply_qty}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.allocate_bottle_to_pending}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.allocate_bottle_to_custody}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.allocate_bottle_to_paid}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.allocate_bottle_to_free}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.collected_empty_bottle}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{% if instance.subtotal == instance.amount_recieved %} Paid {% else %} Non Paid {% endif %}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.payment_mode}}</td>
-                                        {% comment %}<td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.discount}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.subtotal}}</td>
-                                        <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.amount_recieved}}</td> {% endcomment %}
-                                        <td class="text-right"  {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>
-                                            <div class="g-2">
-                                                <a href="{% url 'customer_supply_info' pk=instance.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Info">
-                                                    <span class="ri-printer-fill fs-14"></span>
-                                                </a>
-                                                <a href="{% url 'view_invoice' invoice_no=instance.invoice_no %}" aria-label="anchor" class="btn btn-info-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="View Invoice">
-                                                    <span class="ri-file-text-fill fs-14"></span>  <!-- Adjust icon as needed -->
-                                                </a>
-                                                {% if instance.can_edit %}
-                                                <a href="{% url 'edit_customer_supply' pk=instance.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
-                                                    <span class="ri-pencil-line fs-14"></span>
-                                                </a>
-                                                <a aria-label="anchor" class="action-button remove btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete"
-                                                    data-id="{{instance.pk}}" data-text="{{confirm_delete_message}}" data-title="Are you sure?" href="{% url 'delete_customer_supply' pk=instance.pk %}"><span class="ri-delete-bin-7-line fs-14"></span>
-                                                </a>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                            </tbody>
-                            <tfoot>
-                            <tr style="font-weight: bold; background-color: #f2f2f2;">
-                                <th colspan="7" class="text-end"><strong>Total:</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_supply|default:0 }}</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_pending|default:0 }}</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_custody|default:0 }}</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_paid|default:0 }}</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_foc|default:0 }}</strong></th>
-                                <th class="text-center"><strong>{{ totals.total_collected|default:0 }}</strong></th>
-                                <th colspan="2"></th>
-                            </tr>
-                        </tfoot>
-                            {% else %}
+                                {% for instance in instances %}
                                 <tr>
-                                    <td colspan="15" class="text-center text-danger fw-bold">No Supply List  found in Records.</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{forloop.counter}}</td>
+                                    <td class="text-left" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.created_date}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.invoice_no}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.customer.custom_id}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.customer.customer_name}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.customer.get_sales_type_display}}</td>
+                                     <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.salesman.get_fullname}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.get_total_supply_qty}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.allocate_bottle_to_free}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.collected_empty_bottle}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{% if instance.subtotal == instance.amount_recieved %} Paid {% else %} Non Paid {% endif %}</td>
+                                    {% comment %}<td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.discount}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.subtotal}}</td>
+                                    <td class="text-center" {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>{{instance.amount_recieved}}</td> {% endcomment %}
+                                    <td class="text-right"  {% if instance.is_edited %}style="background-color:#c0dfdf !important;"{% endif %}>
+                                        <div class="g-2">
+                                            <a href="{% url 'customer_supply_info' pk=instance.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Info">
+                                                <span class="ri-printer-fill fs-14"></span>
+                                            </a>
+                                            <a href="{% url 'view_invoice' invoice_no=instance.invoice_no %}" aria-label="anchor" class="btn btn-info-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="View Invoice">
+                                                <span class="ri-file-text-fill fs-14"></span>  <!-- Adjust icon as needed -->
+                                            </a>
+                                            {% if instance.can_edit %}
+                                            <a href="{% url 'edit_customer_supply' pk=instance.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
+                                                <span class="ri-pencil-line fs-14"></span>
+                                            </a>
+                                            
+                                            <a aria-label="anchor" class="action-button remove btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete"
+                                                data-id="{{instance.pk}}" data-text="{{confirm_delete_message}}" data-title="Are you sure?" href="{% url 'delete_customer_supply' pk=instance.pk %}"><span class="ri-delete-bin-7-line fs-14"></span>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                 </tr>
-                                {% endif %}
+                                {%endfor%}
+                            </tbody>
                         </table>
                     </div>
                     {% get_pages %}

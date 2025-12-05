@@ -89,6 +89,14 @@
                                     <!--                                <small class="form-text text-muted">Select Category.</small>-->
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="form-group required">
+                                    <label class='control-label'>Van Type</label>
+                                    {{ form.van_type }}
+                                    <span style="color: red;">{{ form.van_type.errors }}</span>
+                                    <!--                                <small class="form-text text-muted">Select Category.</small>-->
+                                </div>
+                            </div>
 
                             <div class="col-12 text-end mt-5">
                                 <input type="submit" class="btn btn-primary me-2 mb-2" value="Submit">

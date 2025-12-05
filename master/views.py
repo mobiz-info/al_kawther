@@ -5,6 +5,7 @@ from datetime import timedelta
 from calendar import monthrange
 
 
+
 from django.views import View
 from django.urls import reverse
 from django.shortcuts import render
@@ -117,7 +118,67 @@ def overview(request):
     door_lock_count = NonvisitReport.objects.filter(created_date__date=date,reason__reason_text="Door Lock").count()
     emergency_customers_count = customers_instances.filter(pk__in=DiffBottlesModel.objects.filter(delivery_date=date).values_list('customer__pk')).count()
     
-    new_customers_count_with_salesman = (Customers.objects.filter(created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username'))
+    new_customers_count_with_salesman = (Customers.objects.filter(is_guest=False, created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username'))
+    
+    
+    context = {
+        # overview section
+        "cash_sales": total_cash_sales_count,
+        "credit_sales": total_credit_sales_count,
+        "total_sales_count": total_cash_sales_count + total_credit_sales_count,
+        "today_expenses": total_expences,
+        "total_today_collections": total_today_collections,
+        "total_old_payment_collections": total_old_payment_collections,
+        "total_collection": total_today_collections + total_old_payment_collections,
+        "total_cash_in_hand": total_today_collections + total_old_payment_collections - total_expences,
+        "active_van_count": active_van_count,
+        "delivery_progress": f'{supply_cash_sales_instances.count() + supply_credit_sales_instances.count()} / {len(todays_customers)}',
+        "total_customers_count": customers_instances.count(),
+        "new_customers_count": customers_instances.filter(created_date__date=date).count(),
+        "door_lock_count": door_lock_count,
+        "emergency_customers_count": emergency_customers_count,
+        "total_vocation_customers_count": len(vocation_customers_instances.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk').distinct()),        
+        "yesterday_missed_customers_count": len(yesterday_customers) - CustomerSupply.objects.filter(created_date__date=yesterday_date).count(),
+        "new_customers_count_with_salesman": [
+            {
+                "salesman_names": item['sales_staff__username'] if item['sales_staff__username'] else "Unassigned",
+                "customer_count": item['customer_count']
+            }
+            for item in new_customers_count_with_salesman
+        ],
+       
+    }
+
+    return render(request, 'master/dashboard/overview_dashboard.html', context) 
+
+def sales(request):
+    # Get the date from the request or use today's date
+    date = request.GET.get('date')
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    else:
+        date = datetime.today().date()
+        
+    yesterday_date = date - timedelta(days=1)
+    
+    # supply
+    todays_supply_instances = CustomerSupply.objects.filter(created_date__date=date)
+    supply_cash_sales_instances = todays_supply_instances.filter(amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
+    supply_credit_sales_instances = todays_supply_instances.filter(amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+    # recharge
+    todays_recharge_instances = CustomerCoupon.objects.filter(created_date__date=date)
+    recharge_cash_sales_instances = todays_recharge_instances.filter(amount_recieved__gt=0)
+    recharge_credit_sales_instances = todays_recharge_instances.filter(amount_recieved__lte=0)
+    # total cash and credit
+    total_cash_sales_count = supply_cash_sales_instances.count() + recharge_cash_sales_instances.count()
+    total_credit_sales_count = supply_credit_sales_instances.count() + recharge_credit_sales_instances.count()
+    # total collection
+    total_supply_cash_sales = supply_cash_sales_instances.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
+    total_rechage_cash_sales = recharge_cash_sales_instances.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
+    total_today_collections = total_supply_cash_sales + total_rechage_cash_sales
+    # old collections
+    old_payment_collections_instances = CollectionPayment.objects.filter(created_date__date=date)
+   
     
     # sales section
     total_cash_sales_amount = supply_cash_sales_instances.aggregate(total_amount=Sum('subtotal'))['total_amount'] or 0
@@ -203,6 +264,40 @@ def overview(request):
     third_last_week_sales_json = json.dumps(third_last_week_sales)
     last_year_monthly_avg_sales_json = json.dumps(full_sales_data)
     
+    context = {
+        # sales section
+        "total_cash_sales_amount": total_cash_sales_amount,
+        "total_credit_sales_amount": total_credit_sales_amount,
+        "total_sales_grand_total": total_sales_grand_total,
+        "total_reachage_sales_amount": total_reachage_sales_amount,
+        "total_rechage_collections": total_rechage_cash_sales,
+        "total_old_payment_cash_collections": total_old_payment_cash_collections,
+        "total_old_payment_credit_collections": total_old_payment_credit_collections,
+        "total_old_payment_grand_total_collections": total_old_payment_cash_collections + total_old_payment_credit_collections,
+        "total_old_payment_coupon_collections": total_old_payment_coupon_collections,
+        "total_cash_outstanding_amounts": total_cash_outstanding_amounts,
+        "total_credit_outstanding_amounts": total_credit_outstanding_amounts,
+        "total_outstanding_amounts": total_outstanding_amounts,
+        "total_coupon_outstanding_amounts": total_coupon_outstanding_amounts,
+        'this_week_sales': this_week_sales_json,
+        'last_week_sales': last_week_sales_json,
+        'second_last_week_sales': second_last_week_sales_json,
+        'third_last_week_sales': third_last_week_sales_json,
+        'last_year_monthly_avg_sales': last_year_monthly_avg_sales_json,
+      
+    }
+    return render(request, 'master/dashboard/sales.html', context) 
+
+def bottles(request):
+    # Get the date from the request or use today's date
+    date = request.GET.get('date')
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    else:
+        date = datetime.today().date()
+    # supply
+    todays_supply_instances = CustomerSupply.objects.filter(created_date__date=date)
+   
     # Bottle Section
     today_supply_bottle_count = CustomerSupplyItems.objects.filter(product__product_name="5 Gallon",customer_supply__pk__in=todays_supply_instances.values_list("pk")).aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
     today_custody_issued_count = CustodyCustomItems.objects.filter(product__product_name="5 Gallon",custody_custom__created_date__date=date).aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
@@ -218,6 +313,96 @@ def overview(request):
     salesmans_instances = CustomUser.objects.filter(pk__in=todays_supply_instances.values_list('salesman__pk'))
     salesman_sales_serializer = SalesmanSupplyCountSerializer(salesmans_instances,many=True,context={"date": date}).data
     
+    context = {
+        # Bottle Section 
+        "today_supply_bottle_count": today_supply_bottle_count,
+        "today_custody_issued_count": today_custody_issued_count,
+        "today_pending_bottle_given_count": today_pending_bottle_given_count,
+        "today_pending_bottle_collected_count": today_pending_bottle_collected_count,
+        "today_outstanding_bottle_count": today_outstanding_bottle_count,
+        "today_scrap_bottle_count": today_scrap_bottle_count,
+        "today_service_bottle_count": today_service_bottle_count,
+        "today_fresh_bottle_stock": today_fresh_bottle_stock,
+        "total_used_bottle_count": total_used_bottle_count,
+        "salesman_sales_serializer": json.dumps(salesman_sales_serializer),
+        
+    }
+
+    return render(request, 'master/dashboard/bottle.html', context)
+
+
+def coupons(request):
+    # Get the date from the request or use today's date
+    date = request.GET.get('date')
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    else:
+        date = datetime.today().date()
+        
+    yesterday_date = date - timedelta(days=1)
+    
+    # supply
+    todays_supply_instances = CustomerSupply.objects.filter(created_date__date=date)
+    supply_cash_sales_instances = todays_supply_instances.filter(amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
+    supply_credit_sales_instances = todays_supply_instances.filter(amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+    # recharge
+    todays_recharge_instances = CustomerCoupon.objects.filter(created_date__date=date)
+    recharge_cash_sales_instances = todays_recharge_instances.filter(amount_recieved__gt=0)
+    recharge_credit_sales_instances = todays_recharge_instances.filter(amount_recieved__lte=0)
+    # total cash and credit
+    total_cash_sales_count = supply_cash_sales_instances.count() + recharge_cash_sales_instances.count()
+    total_credit_sales_count = supply_credit_sales_instances.count() + recharge_credit_sales_instances.count()
+    # total collection
+    total_supply_cash_sales = supply_cash_sales_instances.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
+    total_rechage_cash_sales = recharge_cash_sales_instances.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
+    total_today_collections = total_supply_cash_sales + total_rechage_cash_sales
+    # old collections
+    old_payment_collections_instances = CollectionPayment.objects.filter(created_date__date=date)
+    total_old_payment_collections = old_payment_collections_instances.aggregate(total_amount_recieved=Sum('amount_received'))['total_amount_recieved'] or 0
+    # expences
+    expenses_instanses = Expense.objects.filter(expense_date=date)
+    total_expences = expenses_instanses.aggregate(total_expense=Sum('amount'))['total_expense'] or 0
+    # active vans
+    active_vans_ids = VanProductStock.objects.filter(stock__gt=0).values_list('van__pk').distinct()
+    active_van_count = Van.objects.filter(pk__in=active_vans_ids).count()
+    
+    customers_instances = Customers.objects.all()
+    vocation_customers_instances = Vacation.objects.all()
+    # scheduled customers
+    route_instances = RouteMaster.objects.all()
+    todays_customers = []
+    yesterday_customers = []
+        
+    for route in route_instances:
+        # todays
+        day_of_week = date.strftime('%A')
+        week_num = (date.day - 1) // 7 + 1
+        week_number = f'Week{week_num}'
+        
+        today_vocation_customer_ids = vocation_customers_instances.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk')
+        today_scheduled_customers = customers_instances.filter(routes=route, is_calling_customer=False).exclude(pk__in=today_vocation_customer_ids)
+        
+        for customer in today_scheduled_customers:
+            if customer.visit_schedule:
+                for day, weeks in customer.visit_schedule.items():
+                    if str(day_of_week) == str(day) and str(week_number) in weeks:
+                        todays_customers.append(customer)
+                        
+        # yesterdays
+        y_day_of_week = yesterday_date.strftime('%A')
+        y_week_num = (yesterday_date.day - 1) // 7 + 1
+        y_week_number = f'Week{y_week_num}'
+        
+        yesterday_vocation_customer_ids = vocation_customers_instances.filter(start_date__gte=yesterday_date,end_date__lte=yesterday_date).values_list('customer__pk')
+        yesterday_scheduled_customers = customers_instances.filter(routes=route, is_calling_customer=False).exclude(pk__in=yesterday_vocation_customer_ids)
+        
+        for customer in yesterday_scheduled_customers:
+            if customer.visit_schedule:
+                for day, weeks in customer.visit_schedule.items():
+                    if str(y_day_of_week) == str(day) and str(y_week_number) in weeks:
+                        yesterday_customers.append(customer)
+                        
+  
     # Coupon Section
     manual_coupon_sold_instances = todays_recharge_instances.filter(coupon_method="manual")
     digital_coupon_sold_instances = todays_recharge_instances.filter(coupon_method="digital")
@@ -246,6 +431,75 @@ def overview(request):
     coupon_salesmans_instances = CustomUser.objects.filter(pk__in=CustomerCoupon.objects.filter(created_date__date=date).values_list('salesman__pk'))
     salesman_recharge_serializer = SalesmanRechargeCountSerializer(coupon_salesmans_instances,many=True,context={"date": date}).data
     
+ 
+    
+
+    
+    context = {
+        
+        # Coupon Sections
+        "manual_coupon_sold_count": manual_coupon_sold_count,
+        "digital_coupon_sold_count": digital_coupon_sold_count,
+        "collected_manual_coupons_count": collected_manual_coupons_count,
+        "collected_digital_coupons_count": collected_digital_coupons_count,
+        "today_manual_coupon_outstanding_count": today_manual_coupon_outstanding_count,
+        "today_digital_coupon_outstanding_count": today_digital_coupon_outstanding_count,
+        "today_pending_manual_coupons_count": today_pending_manual_coupons_count,
+        "today_pending_digital_coupons_count": today_pending_digital_coupons_count,
+        "today_pending_manual_coupons_collected_count": today_pending_manual_coupons_collected_count,
+        "today_pending_digital_coupons_collected_count": today_pending_digital_coupons_collected_count,
+        "salesman_recharge_serializer": json.dumps(salesman_recharge_serializer),
+     
+    }
+
+    return render(request, 'master/dashboard/coupons.html', context)
+
+def customer_statistics(request):
+    # Get the date from the request or use today's date
+    date = request.GET.get('date')
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+    else:
+        date = datetime.today().date()
+        
+    yesterday_date = date - timedelta(days=1)
+    customers_instances = Customers.objects.all()
+    vocation_customers_instances = Vacation.objects.all()
+    # scheduled customers
+    route_instances = RouteMaster.objects.all()
+    todays_customers = []
+    yesterday_customers = []
+        
+    for route in route_instances:
+        # todays
+        day_of_week = date.strftime('%A')
+        week_num = (date.day - 1) // 7 + 1
+        week_number = f'Week{week_num}'
+        
+        today_vocation_customer_ids = vocation_customers_instances.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk')
+        today_scheduled_customers = customers_instances.filter(routes=route, is_calling_customer=False).exclude(pk__in=today_vocation_customer_ids)
+        
+        for customer in today_scheduled_customers:
+            if customer.visit_schedule:
+                for day, weeks in customer.visit_schedule.items():
+                    if str(day_of_week) == str(day) and str(week_number) in weeks:
+                        todays_customers.append(customer)
+                        
+        # yesterdays
+        y_day_of_week = yesterday_date.strftime('%A')
+        y_week_num = (yesterday_date.day - 1) // 7 + 1
+        y_week_number = f'Week{y_week_num}'
+        
+        yesterday_vocation_customer_ids = vocation_customers_instances.filter(start_date__gte=yesterday_date,end_date__lte=yesterday_date).values_list('customer__pk')
+        yesterday_scheduled_customers = customers_instances.filter(routes=route, is_calling_customer=False).exclude(pk__in=yesterday_vocation_customer_ids)
+        
+        for customer in yesterday_scheduled_customers:
+            if customer.visit_schedule:
+                for day, weeks in customer.visit_schedule.items():
+                    if str(y_day_of_week) == str(day) and str(y_week_number) in weeks:
+                        yesterday_customers.append(customer)
+                        
+   
     # Customer  statistics
     call_customers_count = customers_instances.filter(is_calling_customer=True).count()
     # inactive_customers_count = customers_instances.filter(is_active=False).count()
@@ -253,7 +507,7 @@ def overview(request):
     today = now().date()
     start_of_month = today.replace(day=1)
 
-    route_data = Customers.objects.filter(routes__route_name__isnull=False).values(
+    route_data = Customers.objects.filter(is_guest=False, routes__route_name__isnull=False).values(
         'routes__route_name'
     ).annotate(
         today_new_customers=Count('customer_id', filter=Q(created_date__date=today)),
@@ -267,7 +521,7 @@ def overview(request):
     route_inactive_customer_count = {}
     inactive_customers_count = 0
     for route in routes:
-        route_customers = Customers.objects.filter(routes=route)
+        route_customers = Customers.objects.filter(is_guest=False, routes=route)
 
         visited_customers = CustomerSupply.objects.filter(
                 created_date__date__range=(last_20_days, today)
@@ -324,7 +578,7 @@ def overview(request):
     )
 
     churn = (
-        Customers.objects.filter(is_active=False)  
+        Customers.objects.filter(is_guest=False, is_active=False)  
         .annotate(month=TruncMonth("created_date"))
         .values("month")
         .annotate(count=Count("customer_id"))
@@ -350,7 +604,7 @@ def overview(request):
 
     for route in routes:
         route_id = route.route_id
-        actual_visitors = Customers.objects.filter(routes__pk=route_id, is_active=True).count()
+        actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
 
         planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
         planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
@@ -380,6 +634,31 @@ def overview(request):
     ]
     
 
+
+    
+    context = {
+        # Customer  statistics
+        "total_customers_count": customers_instances.count(),
+
+        "call_customers_count": call_customers_count,
+        "inactive_customers_count" : inactive_customers_count,
+        "total_vocation_customers_count": len(vocation_customers_instances.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk').distinct()),        
+
+        "route_data" : route_data,
+        "route_inactive_customer_count" : route_inactive_customer_count,
+        "non_visited_customers_data": non_visited_customers_data,
+        "chart_data": json.dumps(chart_data),
+        'routes_data': routes_data,
+        'planned_data': planned_data,
+        'actual_data': actual_data,
+        'salesman_supply_data': salesman_supply_data,
+    }
+
+    return render(request, 'master/dashboard/customer_statistics.html', context)
+
+def others(request):
+        
+    today = now().date()
     # others    
     pending_complaints_count = CustomerComplaint.objects.filter(status='Pending').count()
     resolved_complaints_count = CustomerComplaint.objects.filter(status='Completed').count()
@@ -393,83 +672,7 @@ def overview(request):
 
     
     context = {
-        # overview section
-        "cash_sales": total_cash_sales_count,
-        "credit_sales": total_credit_sales_count,
-        "total_sales_count": total_cash_sales_count + total_credit_sales_count,
-        "today_expenses": total_expences,
-        "total_today_collections": total_today_collections,
-        "total_old_payment_collections": total_old_payment_collections,
-        "total_collection": total_today_collections + total_old_payment_collections,
-        "total_cash_in_hand": total_today_collections + total_old_payment_collections - total_expences,
-        "active_van_count": active_van_count,
-        "delivery_progress": f'{supply_cash_sales_instances.count() + supply_credit_sales_instances.count()} / {len(todays_customers)}',
-        "total_customers_count": customers_instances.count(),
-        "new_customers_count": customers_instances.filter(created_date__date=date).count(),
-        "door_lock_count": door_lock_count,
-        "emergency_customers_count": emergency_customers_count,
-        "total_vocation_customers_count": len(vocation_customers_instances.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk').distinct()),        
-        "yesterday_missed_customers_count": len(yesterday_customers) - CustomerSupply.objects.filter(created_date__date=yesterday_date).count(),
-        "new_customers_count_with_salesman": [
-            {
-                "salesman_names": item['sales_staff__username'] if item['sales_staff__username'] else "Unassigned",
-                "customer_count": item['customer_count']
-            }
-            for item in new_customers_count_with_salesman
-        ],
-        # sales section
-        "total_cash_sales_amount": total_cash_sales_amount,
-        "total_credit_sales_amount": total_credit_sales_amount,
-        "total_sales_grand_total": total_sales_grand_total,
-        "total_reachage_sales_amount": total_reachage_sales_amount,
-        "total_rechage_collections": total_rechage_cash_sales,
-        "total_old_payment_cash_collections": total_old_payment_cash_collections,
-        "total_old_payment_credit_collections": total_old_payment_credit_collections,
-        "total_old_payment_grand_total_collections": total_old_payment_cash_collections + total_old_payment_credit_collections,
-        "total_old_payment_coupon_collections": total_old_payment_coupon_collections,
-        "total_cash_outstanding_amounts": total_cash_outstanding_amounts,
-        "total_credit_outstanding_amounts": total_credit_outstanding_amounts,
-        "total_outstanding_amounts": total_outstanding_amounts,
-        "total_coupon_outstanding_amounts": total_coupon_outstanding_amounts,
-        'this_week_sales': this_week_sales_json,
-        'last_week_sales': last_week_sales_json,
-        'second_last_week_sales': second_last_week_sales_json,
-        'third_last_week_sales': third_last_week_sales_json,
-        'last_year_monthly_avg_sales': last_year_monthly_avg_sales_json,
-        # Bottle Section 
-        "today_supply_bottle_count": today_supply_bottle_count,
-        "today_custody_issued_count": today_custody_issued_count,
-        "today_pending_bottle_given_count": today_pending_bottle_given_count,
-        "today_pending_bottle_collected_count": today_pending_bottle_collected_count,
-        "today_outstanding_bottle_count": today_outstanding_bottle_count,
-        "today_scrap_bottle_count": today_scrap_bottle_count,
-        "today_service_bottle_count": today_service_bottle_count,
-        "today_fresh_bottle_stock": today_fresh_bottle_stock,
-        "total_used_bottle_count": total_used_bottle_count,
-        "salesman_sales_serializer": json.dumps(salesman_sales_serializer),
-        # Coupon Sections
-        "manual_coupon_sold_count": manual_coupon_sold_count,
-        "digital_coupon_sold_count": digital_coupon_sold_count,
-        "collected_manual_coupons_count": collected_manual_coupons_count,
-        "collected_digital_coupons_count": collected_digital_coupons_count,
-        "today_manual_coupon_outstanding_count": today_manual_coupon_outstanding_count,
-        "today_digital_coupon_outstanding_count": today_digital_coupon_outstanding_count,
-        "today_pending_manual_coupons_count": today_pending_manual_coupons_count,
-        "today_pending_digital_coupons_count": today_pending_digital_coupons_count,
-        "today_pending_manual_coupons_collected_count": today_pending_manual_coupons_collected_count,
-        "today_pending_digital_coupons_collected_count": today_pending_digital_coupons_collected_count,
-        "salesman_recharge_serializer": json.dumps(salesman_recharge_serializer),
-        # Customer  statistics
-        "call_customers_count": call_customers_count,
-        "inactive_customers_count" : inactive_customers_count,
-        "route_data" : route_data,
-        "route_inactive_customer_count" : route_inactive_customer_count,
-        "non_visited_customers_data": non_visited_customers_data,
-        "chart_data": json.dumps(chart_data),
-        'routes_data': routes_data,
-        'planned_data': planned_data,
-        'actual_data': actual_data,
-        'salesman_supply_data': salesman_supply_data,
+       
         #others
         "pending_complaints_count":pending_complaints_count,
         "total_expense": total_expense,
@@ -478,8 +681,7 @@ def overview(request):
         "resolved_complaints_count":resolved_complaints_count,
     }
 
-    return render(request, 'master/dashboard/overview_dashboard.html', context) 
-
+    return render(request, 'master/dashboard/others.html', context)
 
 class Branch_List(View):
     template_name = 'master/branch_list.html'
@@ -865,7 +1067,7 @@ class Category_List(View):
 
     @method_decorator(login_required)
     def get(self, request, *args, **kwargs):
-        category_li = CategoryMaster.objects.filter(is_deleted=False)
+        category_li = CategoryMaster.objects.filter()
         context = {'category_li': category_li}
         return render(request, self.template_name, context)
 
@@ -932,20 +1134,6 @@ class Category_Details(View):
         category_det = CategoryMaster.objects.get(category_id=pk)
         context = {'category_det': category_det}
         return render(request, self.template_name, context)
-
-class Category_Delete(View):
-    @method_decorator(login_required)
-    def post(self, request, pk, *args, **kwargs):
-        try:
-            rec = CategoryMaster.objects.get(category_id=pk, is_deleted=False)
-            rec.is_deleted = True
-            rec.modified_by = str(request.user.id)
-            rec.modified_date = datetime.now()
-            rec.save()
-            messages.success(request, 'Category deleted successfully.', 'alert-success')
-        except CategoryMaster.DoesNotExist:
-            messages.error(request, 'Category not found.', 'alert-danger')
-        return redirect('category')
     
 # def create_emirates():
 #     EmirateMaster.objects.create(created_by = "default",name = "Abudhabi")
@@ -1113,11 +1301,293 @@ def terms_and_conditions_delete(request, pk):
 #         ]
         
 #         Retrieve customer instances for mismatched customers
-#         instances = Customers.objects.filter(pk__in=mismatched_customers)
-#         instances = Customers.objects.filter(custom_id__in=custom_ids).exclude(custom_id__in=exclude_ids)
+#         instances = Customers.objects.filter(is_guest=False, pk__in=mismatched_customers)
+#         instances = Customers.objects.filter(is_guest=False, custom_id__in=custom_ids).exclude(custom_id__in=exclude_ids)
         
 #         context = {
 #             'instances': instances
+#         }
+#         return render(request, self.template_name, context)
+from django.utils import timezone
+# class AmountChangesCustomersList(View):
+#     template_name = 'master/amount_changes_customer_list.html'
+
+#     @method_decorator(login_required)
+#     def get(self, request, *args, **kwargs):
+#         mismatched_customers = []
+#         route_li = RouteMaster.objects.all()
+#         filter_data = {}
+
+#         # Get filter values from request
+#         route_name = request.GET.get('route_name')
+#         start_date_str = request.GET.get('start_date')
+#         end_date_str = request.GET.get('end_date')
+
+#         start_date = end_date = None
+#         if start_date_str:
+#             naive_start = datetime.strptime(start_date_str, '%Y-%m-%d')
+#             start_date = timezone.make_aware(naive_start)
+#             filter_data['start_date'] = start_date_str
+
+#         if end_date_str:
+#             naive_end = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+#             end_date = timezone.make_aware(naive_end)
+#             filter_data['end_date'] = end_date_str
+
+#         if route_name:
+#             filter_data['route_filter'] = route_name
+        
+#             # Get mismatched supply entries (subtotal ≠ amount_received)
+#             supply_cust_instances = CustomerSupply.objects.filter(customer__routes__route_name=route_name).exclude(subtotal=F('amount_recieved'))
+#             supply_cust_recivd = supply_cust_instances.aggregate(total_amount=Sum('amount_recieved'))['total_amount'] or 0
+#             supply_cust_ids = supply_cust_instances.values_list('customer_id', flat=True)
+
+#             # Get mismatched coupon entries (total_payeble ≠ amount_recieved)
+#             coupon_cust_instances = CustomerCoupon.objects.filter(customer__routes__route_name=route_name).exclude(total_payeble=F('amount_recieved'))
+#             coupon_cust_recivd = coupon_cust_instances.aggregate(total_amount=Sum('amount_recieved'))['total_amount'] or 0
+#             coupon_cust_ids = coupon_cust_instances.values_list('customer_id', flat=True)
+            
+#             invoice_qs = Invoice.objects.filter(customer__routes__route_name=route_name,is_deleted=False).exclude(amout_total=F('amout_recieved'))
+#             invoice_qs_recivd = invoice_qs.aggregate(total_amount=Sum('amout_recieved'))['total_amount'] or 0
+#             invoice_qs_cust_ids = invoice_qs.values_list('customer_id', flat=True)
+
+#             # Combine both sets of customer IDs
+#             all_mismatched_ids = set(supply_cust_ids) | set(coupon_cust_ids) | set(invoice_qs_cust_ids)
+
+#             # Get the actual Customer records
+#             mismatched_customers = Customers.objects.filter(pk__in=all_mismatched_ids)
+            
+#             # # Filter customers by route
+
+#             # for customer_instance in customer_instances:
+#             #     # Get outstanding amount
+#             #     outstanding_qs = OutstandingAmount.objects.filter(
+#             #         customer_outstanding__customer=customer_instance,
+#             #         customer_outstanding__product_type="amount"
+#             #     )
+#             #     if start_date and end_date:
+#             #         outstanding_qs = outstanding_qs.filter(
+#             #             customer_outstanding__created_date__range=(start_date, end_date)
+#             #         )
+#             #     outstanding = outstanding_qs.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+
+#             #     # Get collection amount
+#             #     collection_qs = CollectionPayment.objects.filter(
+#             #         customer=customer_instance
+#             #     )
+#             #     if start_date and end_date:
+#             #         collection_qs = collection_qs.filter(created_date__range=(start_date, end_date))
+#             #     collection = collection_qs.aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
+
+#             #     # Calculate outstanding balance
+#             #     outstanding_balance = outstanding - collection
+
+#             #     # Get invoice balance
+#             #     invoice_qs = Invoice.objects.filter(
+#             #         customer=customer_instance,
+#             #         is_deleted=False
+#             #     )
+#             #     if start_date and end_date:
+#             #         invoice_qs = invoice_qs.filter(created_date__range=(start_date, end_date))
+
+#             #     invoice_balance = sum(
+#             #         invoice.amout_total - invoice.amout_recieved for invoice in invoice_qs
+#             #     )
+
+#             #     # Compare balances
+#             #     if outstanding_balance != invoice_balance:
+#             #         mismatched_customers.append({
+#             #             'customer': customer_instance,
+#             #             'outstanding_balance': outstanding_balance,
+#             #             'invoice_balance': invoice_balance
+#             #         })
+
+#         context = {
+#             'instances': mismatched_customers,
+#             'route_li': route_li,
+#             'filter_data': filter_data,
+#         }
+#         return render(request, self.template_name, context)
+
+# class AmountChangesCustomersList(View):
+#     template_name = 'master/amount_changes_customer_list.html'
+
+#     @method_decorator(login_required)
+#     def get(self, request, *args, **kwargs):
+#         mismatched_customers = []
+#         route_li = RouteMaster.objects.all()
+#         filter_data = {}
+
+#         route_name = request.GET.get('route_name')
+#         start_date_str = request.GET.get('start_date')
+#         end_date_str = request.GET.get('end_date')
+
+#         start_date = end_date = None
+#         if start_date_str:
+#             naive_start = datetime.strptime(start_date_str, '%Y-%m-%d')
+#             start_date = timezone.make_aware(naive_start)
+#             filter_data['start_date'] = start_date_str
+
+#         if end_date_str:
+#             naive_end = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+#             end_date = timezone.make_aware(naive_end)
+#             filter_data['end_date'] = end_date_str
+
+#         if route_name:
+#             filter_data['route_filter'] = route_name
+
+#             # Base filter
+#             base_filter = Q(customer__routes__route_name=route_name)
+#             if start_date and end_date:
+#                 base_filter &= Q(created_date__range=(start_date, end_date))
+
+#             # Mismatched QuerySets
+#             supply_qs = CustomerSupply.objects.filter(base_filter).exclude(net_payable=F('amount_recieved'))
+#             coupon_qs = CustomerCoupon.objects.filter(base_filter).exclude(total_payeble=F('amount_recieved'))
+#             invoice_qs = Invoice.objects.filter(base_filter, is_deleted=False).exclude(amout_total=F('amout_recieved'))
+
+#             # Collect unique customer IDs
+#             all_ids = (
+#                 set(supply_qs.values_list('customer_id', flat=True)) |
+#                 set(coupon_qs.values_list('customer_id', flat=True)) |
+#                 set(invoice_qs.values_list('customer_id', flat=True))
+#             )
+
+#             customers = Customers.objects.filter(pk__in=all_ids)
+
+#             for cust in customers:
+#                 # Calculate received totals
+#                 supply_rec = supply_qs.filter(customer=cust).aggregate(total=Sum('net_payable'))['total'] or 0
+#                 coupon_rec = coupon_qs.filter(customer=cust).aggregate(total=Sum('total_payeble'))['total'] or 0
+#                 invoice_rec = invoice_qs.filter(customer=cust).aggregate(total=Sum('amout_recieved'))['total'] or 0
+
+#                 # Combine for total received from field activities
+#                 supply_coupon_total = round(supply_rec + coupon_rec, 2)
+#                 difference = round(supply_coupon_total - invoice_rec, 2)
+
+#                 # Only show mismatched ones
+#                 if difference != 0:
+#                     mismatched_customers.append({
+#                         'customer': cust,
+#                         'route': route_name,
+#                         'supply_coupon_total': supply_coupon_total,
+#                         'invoice_received': round(invoice_rec, 2),
+#                         'difference': difference,
+#                     })
+
+#         # Total summary
+#         total_supply_coupon = sum(item['supply_coupon_total'] for item in mismatched_customers)
+#         total_invoice = sum(item['invoice_received'] for item in mismatched_customers)
+#         total_difference = sum(item['difference'] for item in mismatched_customers)
+
+#         context = {
+#             'instances': mismatched_customers,
+#             'route_li': route_li,
+#             'filter_data': filter_data,
+#             'total_supply_coupon': round(total_supply_coupon, 2),
+#             'total_invoice': round(total_invoice, 2),
+#             'total_difference': round(total_difference, 2),
+#         }
+#         return render(request, self.template_name, context)
+
+# class AmountChangesCustomersList(View):
+#     template_name = 'master/amount_changes_customer_list.html'
+
+#     @method_decorator(login_required)
+#     def get(self, request, *args, **kwargs):
+#         route_li = RouteMaster.objects.all()
+#         filter_data = {}
+#         mismatched_customers = []
+
+#         route_name = request.GET.get('route_name')
+#         start_date_str = request.GET.get('start_date')
+#         end_date_str = request.GET.get('end_date')
+
+#         start_date = end_date = None
+#         if start_date_str:
+#             naive_start = datetime.strptime(start_date_str, '%Y-%m-%d')
+#             start_date = timezone.make_aware(naive_start)
+#             filter_data['start_date'] = start_date_str
+
+#         if end_date_str:
+#             naive_end = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+#             end_date = timezone.make_aware(naive_end)
+#             filter_data['end_date'] = end_date_str
+
+#         if route_name:
+#             filter_data['route_filter'] = route_name
+#             route_filter = Q(customer__routes__route_name=route_name)
+
+#             # Apply common date range filter if available
+#             date_filter = Q()
+#             if start_date and end_date:
+#                 date_filter = Q(created_date__range=(start_date, end_date))
+
+#             # Get all customers for this route
+#             customers = Customers.objects.filter(routes__route_name=route_name).distinct()
+
+#             for cust in customers:
+#                 # ---- Supply Outstanding ----
+#                 supply_qs = CustomerSupply.objects.filter(route_filter, date_filter, customer=cust)
+#                 supply_data = supply_qs.aggregate(
+#                     total_sales=Sum('subtotal'), total_received=Sum('amount_recieved')
+#                 )
+#                 supply_sales = supply_data['total_sales'] or 0
+#                 supply_received = supply_data['total_received'] or 0
+#                 supply_outstanding = supply_sales - supply_received
+
+#                 # ---- Coupon Recharge Outstanding ----
+#                 coupon_qs = CustomerCoupon.objects.filter(route_filter, date_filter, customer=cust)
+#                 coupon_data = coupon_qs.aggregate(
+#                     total_sales=Sum('total_payeble'), total_received=Sum('amount_recieved')
+#                 )
+#                 coupon_sales = coupon_data['total_sales'] or 0
+#                 coupon_received = coupon_data['total_received'] or 0
+#                 coupon_outstanding = coupon_sales - coupon_received
+
+#                 # ---- Invoice Outstanding ----
+#                 invoice_qs = Invoice.objects.filter(route_filter, date_filter, customer=cust, is_deleted=False)
+#                 invoice_data = invoice_qs.aggregate(
+#                     total_sales=Sum('amout_total'), total_received=Sum('amout_recieved')
+#                 )
+#                 invoice_sales = invoice_data['total_sales'] or 0
+#                 invoice_received = invoice_data['total_received'] or 0
+#                 invoice_outstanding = invoice_sales - invoice_received
+
+#                 # ---- Total Outstanding ----
+#                 total_outstanding = supply_outstanding + coupon_outstanding + invoice_outstanding
+
+#                 # ---- Collection ----
+#                 collection_qs = CollectionPayment.objects.filter(customer=cust)
+#                 if start_date and end_date:
+#                     collection_qs = collection_qs.filter(created_date__range=(start_date, end_date))
+#                 total_collected = collection_qs.aggregate(Sum('amount_received'))['amount_received__sum'] or 0
+
+#                 # ---- Compare ----
+#                 if round(total_outstanding, 2) != round(total_collected, 2):
+#                     mismatched_customers.append({
+#                         'customer': cust,
+#                         'route': route_name,
+#                         'supply_outstanding': round(supply_outstanding, 2),
+#                         'coupon_outstanding': round(coupon_outstanding, 2),
+#                         'invoice_outstanding': round(invoice_outstanding, 2),
+#                         'total_outstanding': round(total_outstanding, 2),
+#                         'total_collected': round(total_collected, 2),
+#                         'difference': round(total_outstanding - total_collected, 2),
+#                     })
+
+#         # ---- Totals ----
+#         total_outstanding_sum = sum(item['total_outstanding'] for item in mismatched_customers)
+#         total_collected_sum = sum(item['total_collected'] for item in mismatched_customers)
+#         total_diff_sum = sum(item['difference'] for item in mismatched_customers)
+
+#         context = {
+#             'instances': mismatched_customers,
+#             'route_li': route_li,
+#             'filter_data': filter_data,
+#             'total_outstanding_sum': round(total_outstanding_sum, 2),
+#             'total_collected_sum': round(total_collected_sum, 2),
+#             'total_diff_sum': round(total_diff_sum, 2),
 #         }
 #         return render(request, self.template_name, context)
 
@@ -1126,59 +1596,92 @@ class AmountChangesCustomersList(View):
 
     @method_decorator(login_required)
     def get(self, request, *args, **kwargs):
-        mismatched_customers = []
         route_li = RouteMaster.objects.all()
         filter_data = {}
-        
-        if request.GET.get('route_name'):
-            filter_data['route_filter'] = request.GET.get('route_name')
-            
-            # Fetch customers in the specified route
-            customer_instances = Customers.objects.filter(routes__route_name=request.GET.get('route_name'))
+        mismatched_customers = []
 
-            for customer_instance in customer_instances:
-                # Calculate outstanding amount
-                outstanding = OutstandingAmount.objects.filter(
-                    customer_outstanding__customer=customer_instance,
-                    customer_outstanding__product_type="amount"
-                ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        # filters
+        route_name = request.GET.get('route_name')
+        start_date_str = request.GET.get('start_date')
+        end_date_str = request.GET.get('end_date')
 
-                # Calculate total collection amount
-                collection = CollectionPayment.objects.filter(
-                    customer=customer_instance
-                ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
+        start_date = end_date = None
+        if start_date_str:
+            start_date = timezone.make_aware(datetime.strptime(start_date_str, '%Y-%m-%d'))
+            filter_data['start_date'] = start_date_str
 
-                # Calculate outstanding balance
-                outstanding_balance = outstanding - collection
-                
-                # amount_equal_supplys_invoice_nos = CustomerSupply.objects.filter(customer=customer_instance,subtotal=F('amount_recieved')).values_list("invoice_no")
-                # Fetch all invoices for the customer
-                invoice_instances = Invoice.objects.filter(
-                    customer=customer_instance,
-                    is_deleted=False
+        if end_date_str:
+            end_date = timezone.make_aware(datetime.strptime(end_date_str, '%Y-%m-%d')) + timedelta(days=1)
+            filter_data['end_date'] = end_date_str
+
+        # filter route
+        customers = Customers.objects.all()
+        if route_name:
+            customers = customers.filter(routes__route_name=route_name)
+            filter_data['route_filter'] = route_name
+
+            # iterate customers
+            for cust in customers.distinct():
+                # --- Outstanding ---
+                outstanding_qs = OutstandingAmount.objects.filter(
+                    customer_outstanding__customer=cust,
+                    customer_outstanding__product_type='amount'
                 )
-                # .exclude(invoice_no__in=amount_equal_supplys_invoice_nos)
+                if start_date and end_date:
+                    outstanding_qs = outstanding_qs.filter(
+                        customer_outstanding__created_date__range=(start_date, end_date)
+                    )
+                outstanding_total = outstanding_qs.aggregate(total=Sum('amount'))['total'] or 0
 
-                # Calculate invoice balance
-                invoice_balance = sum(
-                    invoice.amout_total - invoice.amout_recieved for invoice in invoice_instances
+                # --- Collection ---
+                collection_qs = CollectionPayment.objects.filter(customer=cust)
+                if start_date and end_date:
+                    collection_qs = collection_qs.filter(created_date__range=(start_date, end_date))
+                collected_total = collection_qs.aggregate(total=Sum('amount_received'))['total'] or 0
+
+                outstanding_diff = round(outstanding_total - collected_total, 2)
+
+                # --- Invoice ---
+                invoice_qs = Invoice.objects.filter(customer=cust, is_deleted=False)
+                if start_date and end_date:
+                    invoice_qs = invoice_qs.filter(created_date__range=(start_date, end_date))
+                invoice_data = invoice_qs.aggregate(
+                    total_invoice=Sum('amout_total'),
+                    total_received=Sum('amout_recieved')
                 )
+                total_invoice = invoice_data['total_invoice'] or 0
+                total_invoice_received = invoice_data['total_received'] or 0
 
-                # Check for mismatch
-                if outstanding_balance != invoice_balance:
+                invoice_diff = round(total_invoice - total_invoice_received, 2)
+
+                # --- Compare both ---
+                # ❌ Skip if both differences are equal or both zero
+                if not outstanding_diff == invoice_diff:
+                    # ✅ Otherwise, show this customer
                     mismatched_customers.append({
-                        'customer': customer_instance,
-                        'outstanding_balance': outstanding_balance,
-                        'invoice_balance': invoice_balance
+                        'customer': cust,
+                        'route': route_name or '',
+                        'outstanding_total': round(outstanding_total, 2),
+                        'collected_total': round(collected_total, 2),
+                        'outstanding_diff': outstanding_diff,
+                        'invoice_total': round(total_invoice, 2),
+                        'invoice_received': round(total_invoice_received, 2),
+                        'invoice_diff': invoice_diff,
                     })
+
+        # totals for footer
+        total_outstanding_diff = sum(item['outstanding_diff'] for item in mismatched_customers)
+        total_invoice_diff = sum(item['invoice_diff'] for item in mismatched_customers)
 
         context = {
             'instances': mismatched_customers,
             'route_li': route_li,
             'filter_data': filter_data,
+            'total_outstanding_diff': round(total_outstanding_diff, 2),
+            'total_invoice_diff': round(total_invoice_diff, 2),
         }
-        return render(request, self.template_name, context)
 
+        return render(request, self.template_name, context)
 
 from datetime import time
 from django.utils.timezone import localtime
@@ -1226,7 +1729,7 @@ def create_outstanding_variation_invoice(request):
                 invoice = Invoice.objects.create(
                     reference_no=customer.custom_id,
                     invoice_no=invoice_no,
-                    invoice_type="credit_invoive",
+                    invoice_type="credit_invoice",
                     invoice_status=invoice_status,
                     created_date=datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M"),
                     net_taxable=amount,
@@ -1486,3 +1989,37 @@ def customer_outstanding_variation_clearing(request):
             }
             
         return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+
+def permission_management_tab_list(request):
+    instances = PermissionManagementTab.objects.all()
+    return render(request, 'master/permissions/permission_management_tab_list.html', {'instances': instances})
+# Create View
+def permission_management_tab_create(request):
+    if request.method == "POST":
+        form = PermissionManagementTabForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('permission_management_tab_list')
+    else:
+        form = PermissionManagementTabForm()
+    return render(request, 'master/permissions/permission_management_tab_form.html', {'form': form})
+
+# Update View
+def permission_management_tab_update(request, pk):
+    tab = get_object_or_404(PermissionManagementTab, pk=pk)
+    if request.method == "POST":
+        form = PermissionManagementTabForm(request.POST, instance=tab)
+        if form.is_valid():
+            form.save()
+            return redirect('permission_management_tab_list')
+    else:
+        form = PermissionManagementTabForm(instance=tab)
+    return render(request, 'master/permissions/permission_management_edit.html', {'form': form})
+
+# Delete View
+def permission_management_tab_delete(request, pk):
+    tab = get_object_or_404(PermissionManagementTab, pk=pk)
+    if request.method == "POST":
+        tab.delete()
+        return redirect('permission_management_tab_list')
+    return render(request, 'master/permissions/permission_management_tab_confirm_delete.html', {'tab': tab})

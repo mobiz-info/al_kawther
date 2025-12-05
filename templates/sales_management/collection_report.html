@@ -59,14 +59,13 @@
                         </div>  
                         <div id="table-container" style="overflow:scroll;">
                             <div class="card-body">
-                                <table class="table table-bordered text-wrap" style="width: 100%">
+                                <table id="responsiveDataTable" class="table table-bordered text-wrap" style="width: 100%">
                                     <thead>
                                         <tr>
                                         <th style="text-align:center;width:5%;" scope="col">Sl.No</th>
                                         <th style="text-align:center;" scope="col">Date</th>
-                                        <th style="text-align:center;" scope="col">Customer ID</th>
                                         <th style="text-align:center;" scope="col">Customer/<br>Mobile No</th>
-                                        <th style="text-align:center;" scope="col">Sales Type</th>
+                                        <th style="text-align:center;" scope="col">Customer ID</th>
                                         <th style="text-align:center;" scope="col">Route</th>
                                         <th style="text-align:center;" scope="col">Building Name<br>No</th>
                                         {% comment %} <th style="text-align:center;" scope="col">Receipt No/<br>Reference No</th> {% endcomment %}
@@ -74,31 +73,32 @@
                                         <th style="text-align:center;" scope="col">Amount Recieved</th>
                                         <th style="text-align:center;" scope="col">Balance</th>
                                         <th style="text-align:center;" scope="col">Mode of Payment</th>
+                                        <th style="text-align:center;" scope="col">Sales Type</th>
                                     </tr>
                                     </thead>
                                     <tbody>
-                                        {% load el_pagination_tags %}
-                                        {% paginate 20 instances %}
-                                        {% for data in instances %}
+                                        {% comment %} {% load el_pagination_tags %} {% endcomment %}
+                                        {% comment %} {% paginate 20 collection_payments %} {% endcomment %}
+                                        {% for data in collection_payments %}
                                         <tr>
                                             <td style="text-align:right;">{{ forloop.counter }}</td>
-                                            <td style="text-align:right;">{{ data.created_date|date:"d/m/Y" }}</td>
-                                            <td style="text-align:left;">{{ data.customer.custom_id }}</td>
-                                            <td style="text-align:left;">{{ data.customer.customer_name }}<br>{{ data.customer.mobile_no }}</td>
-                                            <td style="text-align:left;">{{ data.customer.get_sales_type_display }}</td>
-                                            <td style="text-align:left;">{{ data.customer.routes.route_name }}</td>
-                                            <td style="text-align:left;"> {{ data.customer.building_name }}<br>{{ data.customer.door_house_no }}</td>
-                                            {% outstanding_collection_balance data.customer.pk data.created_date  as collection %}
-                                            <td style="text-align:center;">{{ collection }}</td>
+                                            <td style="text-align:right;">{{ data.created_date__date|date:"d/m/Y" }}</td>
+                                            <td style="text-align:left;">{{ data.customer__customer_name }}<br>{{ data.customer__mobile_no }}</td>
+                                            <td style="text-align:left;">{{ data.customer__custom_id }}</td>
+                                            <td style="text-align:left;">{{ data.customer__routes__route_name }}</td>
+                                            <td style="text-align:left;"> {{ data.customer__building_name }}<br>{{ data.customer__door_house_no }}</td>
+                                            <td style="text-align:center;">{{ data.total_amount  }}</td>
                                             <td style="text-align:center;">{{ data.collected_amount }}</td>
-                                            <td style="text-align:center;">{{ collection|subtract:data.collected_amount}}</td>
+                                            <td style="text-align:center;">{{ data.total_amount|subtract:data.collected_amount}}</td>
                                             <td style="text-align:left;">{{ data.payment_method }}</td>
+                                            <td style="text-align:left;">{{ data.customer__sales_type }}</td>
+                                           
                                         </tr>
-                                        {%endfor%}
+                                    {%endfor%}
                                     </tbody>
                                     <tfoot>
                                         <tr style="font-weight: bold; background-color: #f8f9fa;">
-                                            <td colspan="7" style="text-align:right !important;">Grand Total:</td>
+                                            <td colspan="6" style="text-align:right !important;">Grand Total:</td>
                                             <td style="text-align:center !important;">{{grand_total_amount }}</td>
                                             <td style="text-align:center !important;">{{ grand_total_collected}}</td>
                                             <td style="text-align:center !important;">{{ grand_total_balance }}</td>
@@ -107,7 +107,7 @@
                                     </tfoot>
                                 </table>
                             </div>
-                            {% get_pages %}
+                            {% comment %} {% get_pages %}
                             <div class="clearfix"></div>
                             <div class="row pagi my-3">
                                 <div class="col-sm-6 col-xs-6 tot my-pagination">
@@ -119,7 +119,7 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-6 col-xs-6 text-end pagination-btn-div">{% show_pages %}</div>
-                            </div>
+                            </div> {% endcomment %}
                         </div>
                     </div>
                 </div>
@@ -128,4 +128,14 @@
         </div>
     </div>
 </div>
+
+
+
+<script>
+    function resetFilters() {
+        // Redirect to the same page
+        location.href = "{% url 'collectionreport' %}";
+    }
+</script>
+
 {% endblock %}

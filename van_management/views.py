@@ -73,7 +73,7 @@ def get_van_coupon_bookno(request):
 #     context = {'all_van': all_van}
 #     return render(request, 'van_management/van.html', context)
 def van(request):
-    all_van = Van.objects.all()
+    all_van = Van.objects.filter(van_type="company")
     
     routes_assigned = {}  # Initialize an empty dictionary
     
@@ -536,7 +536,7 @@ def schedule_by_route(request, def_date, route_id, trip):
     # todays_customers = []
 
     # buildings = []
-    # for customer in Customers.objects.filter(routes = route):
+    # for customer in Customers.objects.filter(is_guest=False, routes = route):
     #     if customer.visit_schedule and day_of_week in customer.visit_schedule and week_number in customer.visit_schedule[day_of_week]:
     #         todays_customers.append(customer)
     #         if customer.building_name not in buildings:
@@ -559,7 +559,7 @@ def schedule_by_route(request, def_date, route_id, trip):
 #     todays_customers = []
 
 #     buildings = []
-#     for customer in Customers.objects.filter(routes=route):
+#     for customer in Customers.objects.filter(is_guest=False, routes=route):
 #         if customer.visit_schedule:
 #             for day, weeks in customer.visit_schedule.items():
 #                 if day in str(day_of_week):
@@ -606,7 +606,7 @@ def schedule_by_route(request, def_date, route_id, trip):
 #         building_gps = []
 
 #         for building, bottle_count in building_count.items():
-#             c = Customers.objects.filter(building_name=building, routes=route).first()
+#             c = Customers.objects.filter(is_guest=False, building_name=building, routes=route).first()
 #             gps_longitude = c.gps_longitude
 #             gps_latitude = c.gps_latitude
 #             building_gps.append((building, gps_longitude, gps_latitude, bottle_count))
@@ -713,7 +713,7 @@ def find_customers(request, def_date, route_id):
     
     todays_customers = []
     buildings = []
-    for customer in Customers.objects.filter(routes=route,is_calling_customer=False,is_deleted=False).exclude(pk__in=vocation_customer_ids):
+    for customer in Customers.objects.filter(is_guest=False, routes=route,is_calling_customer=False,is_deleted=False,is_active=True).exclude(pk__in=vocation_customer_ids):
         if customer.visit_schedule:
             for day, weeks in customer.visit_schedule.items():
                 if day in str(day_of_week) and week_number in str(weeks):
@@ -748,7 +748,7 @@ def find_customers(request, def_date, route_id):
 
         building_gps = []
         for building, bottle_count in building_count.items():
-            c = Customers.objects.filter(building_name=building, routes=route,is_deleted=False).first()
+            c = Customers.objects.filter(is_guest=False, building_name=building, routes=route,is_deleted=False,is_active=True).first()
             building_gps.append((building, c.gps_longitude, c.gps_latitude, bottle_count))
 
         # Sort buildings by GPS coordinates
@@ -1014,7 +1014,7 @@ def excel_download(request, route_id, def_date, trip):
 
         # Merge cells and write other information with borders
         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 16, 'border': 1})
-        worksheet.merge_range('A1:N2', f'Al Kawthar Pure Drinking Water', merge_format)
+        worksheet.merge_range('A1:N2', f'Sana Water', merge_format)
         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
         worksheet.merge_range('A3:D3', f'Route:    {route.route_name}    {trip}', merge_format)
         worksheet.merge_range('E3:I3', f'Date: {def_date}', merge_format)
@@ -1510,8 +1510,8 @@ class EditProductView(View):
                 washing_instance.quantity = washing_count
                 washing_instance.save()
                 
-                if WashingStock.objects.filter(product=washing_instance.product).exists():
-                    washing_stock,washing_stock_create = WashingStock.objects.get_or_create(product=washing_instance.product)
+                if WashingStock.objects.filter(product=scrap_instance.product).exists():
+                    washing_stock,washing_stock_create = WashingStock.objects.get_or_create(product=scrap_instance.product)
                     washing_stock.quantity += washing_count
                     washing_stock.save()
                 
@@ -1751,59 +1751,27 @@ def EditBottleAllocation(request, route_id=None):
 class VanCouponStockList(View):
     def get(self, request, *args, **kwargs):
         filter_data = {}
-
+        
         date = request.GET.get('date')
-        van_name = request.GET.get('van_name')
-
         if date:
             date = datetime.strptime(date, '%Y-%m-%d').date()
             filter_data['filter_date'] = date.strftime('%Y-%m-%d')
         else:
             date = datetime.today().date()
             filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-
+        
         van_coupon_stock = VanCouponStock.objects.filter(created_date=date)
-
-        if van_name:
-            van_coupon_stock = van_coupon_stock.filter(van__pk=van_name)
-            filter_data['filter_van'] = van_name
-
-        van_instances = Van.objects.all()
 
         log_activity(
             created_by=request.user,
-            description="Viewed Van Coupon Stock page."
+            description=f"Viewed Van Coupon Stock page ."
         )
-
+        
         context = {
             'van_coupon_stock': van_coupon_stock,
-            'van_instances': van_instances,
             'filter_data': filter_data,
         }
         return render(request, 'van_management/van_coupon_stock.html', context)
-    # def get(self, request, *args, **kwargs):
-    #     filter_data = {}
-        
-    #     date = request.GET.get('date')
-    #     if date:
-    #         date = datetime.strptime(date, '%Y-%m-%d').date()
-    #         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-    #     else:
-    #         date = datetime.today().date()
-    #         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-        
-    #     van_coupon_stock = VanCouponStock.objects.filter(created_date=date)
-
-    #     log_activity(
-    #         created_by=request.user,
-    #         description=f"Viewed Van Coupon Stock page ."
-    #     )
-        
-    #     context = {
-    #         'van_coupon_stock': van_coupon_stock,
-    #         'filter_data': filter_data,
-    #     }
-    #     return render(request, 'van_management/van_coupon_stock.html', context)
 
 
 # List view
@@ -2103,71 +2071,84 @@ def update_request_status(request, pk):
     return redirect('salesman_customer_requests_list')
 
 #--------------------------------------auditing-------------------------------------------
-
+from van_management.templatetags.van_template_tags import get_audit_details
 def audit_report(request):
     audits = AuditBase.objects.select_related('route', 'marketing_executieve').annotate(
         total_customers=Count('route__customer_route', distinct=True),
         audited_customers=Count('audit_details__customer', distinct=True)
     ).order_by('-start_date')
 
-    print(audits.query)
-
     return render(request, 'van_management/audit_report.html', {'audits': audits})
+
 
 def audit_detail(request, audit_id):
     audit = get_object_or_404(AuditBase, id=audit_id)
     audit_details = audit.audit_details.all()
 
-    audit_combined = []  
-    for audit_detail in audit_details:
-        customer = audit_detail.customer
-        date = audit.created_date
+    totals = {
+        'previous_outstanding_amount': Decimal("0.00"),
+        'audit_outstanding_amount': Decimal("0.00"),
+        'amount_variation': Decimal("0.00"),
+        'previous_outstanding_coupon': 0,
+        'audit_outstanding_coupon': 0,
+        'coupon_variation': 0,
+        'previous_bottle': 0,
+        'audit_bottle': 0,
+        'bottle_variation': 0,
+        'previous_hot_and_cold': 0,
+        'audit_hot_and_cold': 0,
+        'hot_and_cold_variation': 0,
+        'previous_table': 0,
+        'audit_table': 0,
+        'table_variation': 0,
+    }
 
-        current_amount = OutstandingAmount.objects.filter(
-            customer_outstanding__customer__pk=customer.pk, 
-            customer_outstanding__created_date__date__lte=date
-        ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+    for item in audit_details:
+        prev_amount = item.previous_outstanding_amount or 0
+        cur_amount = item.outstanding_amount or 0
+        prev_coupon = item.previous_outstanding_coupon or 0
+        cur_coupon = item.outstanding_coupon or 0
+        prev_bottle = item.previous_bottle_outstanding or 0
+        cur_bottle = item.bottle_outstanding or 0
 
-        collection_amount = CollectionPayment.objects.filter(
-            customer__pk=customer.pk, 
-            created_date__date__lte=date
-        ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
+        amount_variation = prev_amount - cur_amount
+        coupon_variation = prev_coupon - cur_coupon
+        bottle_variation = prev_bottle - cur_bottle
 
-        current_amount -= collection_amount
+        totals['previous_outstanding_amount'] += prev_amount
+        totals['audit_outstanding_amount'] += cur_amount
+        totals['amount_variation'] += amount_variation
+
+        totals['previous_outstanding_coupon'] += prev_coupon
+        totals['audit_outstanding_coupon'] += cur_coupon
+        totals['coupon_variation'] += coupon_variation
+
+        totals['previous_bottle'] += prev_bottle
+        totals['audit_bottle'] += cur_bottle
+        totals['bottle_variation'] += bottle_variation
         
-        current_bottles = OutstandingProduct.objects.filter(
-            customer_outstanding__customer=customer, 
-            customer_outstanding__created_date__lte=date
-        ).aggregate(total_bottles=Sum('empty_bottle'))['total_bottles'] or 0
+        prev_hotcold = item.previous_hot_and_cold_dispenser or 0
+        cur_hotcold = item.hot_and_cold_dispenser or 0
+        hotcold_variation = prev_hotcold - cur_hotcold
 
-        current_coupons = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer=customer,
-            customer_outstanding__created_date__lte=date
-        ).aggregate(total_coupons=Sum('count'))['total_coupons'] or 0
+        prev_table = item.previous_table_dispenser or 0
+        cur_table = item.table_dispenser or 0
+        table_variation = prev_table - cur_table
 
-        audit_amount = audit_detail.outstanding_amount or 0
-        audit_bottles = audit_detail.bottle_outstanding or 0
-        audit_coupons = audit_detail.outstanding_coupon or 0
-        
-        amount_variation = current_amount - audit_amount
-        bottle_variation = current_bottles - audit_bottles
-        coupon_variation = current_coupons - audit_coupons
-        
-        audit_combined.append({
-            'customer': customer.customer_name,
-            'outstanding_amount': audit_amount,
-            'amount_variation': amount_variation,
-            'outstanding_coupon': audit_coupons,
-            'coupon_variation': coupon_variation,
-            'bottle_count': audit_bottles,
-            'bottle_variation': bottle_variation,
-        })
+        totals['previous_hot_and_cold'] += prev_hotcold
+        totals['audit_hot_and_cold'] += cur_hotcold
+        totals['hot_and_cold_variation'] += hotcold_variation
+
+        totals['previous_table'] += prev_table
+        totals['audit_table'] += cur_table
+        totals['table_variation'] += table_variation
 
     context = {
         'audit': audit,
-        'audit_combined': audit_combined,  
+        'audit_details': audit_details,
+        'totals': totals
     }
-    
+
     return render(request, 'van_management/audit_detail.html', context)
 
 
@@ -2393,7 +2374,7 @@ def route_damage_detail(request, route_id):
 
     # Aggregate total quantities
     damage_records = damage_records.values(
-        "created_date", "product__product_name", "reason__reason", "van__van_make"
+        "id", "created_date", "product__product_name", "reason__reason", "van__van_make"
     ).annotate(total_quantity=Sum("quantity")).order_by("created_date")
 
     # Calculate grand total quantity
@@ -2494,6 +2475,151 @@ def route_damage_detail_print(request, route_id):
     }
 
     return render(request, "van_management/van_routewise_damage/route_damage_detail_print.html", context)
+
+
+def edit_van_sale_damage(request, pk):
+    instance = get_object_or_404(VanSaleDamage, pk=pk)
+    van_instance = Van.objects.get(pk=instance.van.pk)
+
+    if request.method == 'POST':
+        form = VanSaleDamageForm(request.POST, instance=instance)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    # Save old values before update
+                    old_damage_from = instance.damage_from
+                    old_quantity = instance.quantity
+                    old_product = instance.product
+
+                    # Get van stock record
+                    vanstock = VanProductStock.objects.get(
+                        product=old_product,
+                        created_date=datetime.now().date(),
+                        van=van_instance
+                    )
+
+                    # 1️⃣ Revert old stock changes
+                    if old_damage_from == "fresh_stock":
+                        vanstock.stock += old_quantity
+                    elif old_damage_from == "empty_can":
+                        vanstock.empty_can_count += old_quantity
+                    vanstock.damage_count -= old_quantity
+
+                    # 2️⃣ Apply new data
+                    updated_instance = form.save(commit=False)
+                    new_damage_from = updated_instance.damage_from
+                    new_quantity = updated_instance.quantity
+
+                    if new_damage_from == "fresh_stock":
+                        vanstock.stock -= new_quantity
+                    elif new_damage_from == "empty_can":
+                        vanstock.empty_can_count -= new_quantity
+                    vanstock.damage_count += new_quantity
+
+                    vanstock.save()
+                    updated_instance.save()
+
+                    # 3️⃣ Log activity
+                    log_activity(
+                        created_by=request.user.id,
+                        description=f"Van Sale Damage updated for {updated_instance.product.product_name} "
+                                    f"from {old_quantity} → {new_quantity} ({new_damage_from})."
+                    )
+                    
+                    response_data = {
+                        "status": "true",
+                        "title": "Successfully Updated",
+                        "message": "Van  Updated Successfully.",
+                        'redirect': 'true',
+                        "redirect_url": reverse('van_damage_stock_report'),
+                        "return": True,
+                    }
+
+
+            except IntegrityError as e:
+                # Handle database integrity error
+                response_data = {
+                    "status": "false",
+                    "title": "Failed",
+                    "message": str(e),
+                }
+
+            except Exception as e:
+                # Handle other exceptions
+                response_data = {
+                    "status": "false",
+                    "title": "Failed",
+                    "message": str(e),
+                }
+        else:
+            message = generate_form_errors(form, formset=False)
+            
+            response_data = {
+                "status": "false",
+                "title": "Failed",
+                "message": message
+            }
+
+        return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+    else:
+        form = VanSaleDamageForm(instance=instance)
+
+    return render(request, 'van_management/van_routewise_damage/damage_edit.html', {'form': form, 'instance': instance})
+
+
+@transaction.atomic
+def delete_van_sale_damage(request, pk):
+    """
+    Deletes a VanSaleDamage record and adjusts van stock accordingly.
+    """
+    damage_instance = get_object_or_404(VanSaleDamage, pk=pk)
+    van = damage_instance.van
+    product = damage_instance.product
+    quantity = damage_instance.quantity
+
+    try:
+        # Get today's van stock (or the stock for the damage date)
+        vanstock = VanProductStock.objects.filter(
+            product=product,
+            created_date=damage_instance.created_date.date(),
+            van=van
+        ).first()
+
+        if vanstock:
+            # Reverse the stock adjustments
+            if hasattr(damage_instance, "damage_from") and damage_instance.damage_from == "fresh_stock":
+                vanstock.stock += quantity
+            elif hasattr(damage_instance, "damage_from") and damage_instance.damage_from == "empty_can":
+                vanstock.empty_can_count += quantity
+
+            vanstock.damage_count -= quantity
+            if vanstock.damage_count < 0:
+                vanstock.damage_count = 0  # prevent negative value
+            vanstock.save()
+
+        # Delete the damage record
+        damage_instance.delete()
+
+        log_activity(request.user, f"Deleted Van Sale Damage for {product.product_name}, Quantity {quantity}")
+        
+        response_data = {
+            "status": "true",
+            "title": "Successfully Deleted",
+            "message": "Van damage record deleted successfully and stock adjusted.",
+            "reload": "true",
+        }
+                
+        return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+
+    except Exception as e:
+        response_data = {
+            "status": "false",
+            "title": "Deletion Failed",
+            "message": str(e),
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+
+
 def route_damage_detail_excel(request, route_id):
     """
     Export van sale damage details for a given route as an Excel file with a footer.
@@ -2587,3 +2713,326 @@ def route_damage_detail_excel(request, route_id):
     # Save the workbook to the response
     workbook.save(response)
     return response
+
+def freelancevan(request):
+    all_van = Van.objects.filter(van_type="freelance")
+    
+    log_activity(
+        created_by=request.user,
+        description="Viewed all freelance vans "
+    ) 
+    context = {
+        'all_van': all_van,
+       
+    }
+    
+    return render(request, 'van_management/freelancevan.html', context)
+
+# def freelancevan_rate_change(request, pk):
+#     van = get_object_or_404(Van, pk=pk)
+
+#     # Ensure only freelance vans can have their rate changed
+#     if van.van_type != 'freelance':
+#         messages.error(request, "Only freelance vans can have their rate changed.")
+#         return redirect('van_list')
+
+#     # Fetch all rate change history
+#     rate_change_history = FreelanceVehicleRateChange.objects.filter(van=van).order_by('-created_date')
+
+#     # Get the last rate change entry for old rate reference
+#     last_rate_change = rate_change_history.first()
+#     old_rate = last_rate_change.new_rate if last_rate_change else 0  
+
+#     if request.method == 'POST':
+#         form = FreelanceVehicleRateChangeForm(request.POST)
+#         if form.is_valid():
+#             rate_change = form.save(commit=False)
+#             rate_change.van = van
+#             rate_change.old_rate = old_rate 
+#             rate_change.created_by = request.user.username
+#             rate_change.save()
+
+#             messages.success(request, "Freelance van rate updated successfully.")
+            
+#             # Reload the same page after successful form submission
+#             return redirect(reverse('freelancevan_rate_change', kwargs={'pk': pk}))
+#         else:
+#             messages.error(request, "Invalid form data. Please check the input.")
+
+#     else:
+#         form = FreelanceVehicleRateChangeForm(initial={'old_rate': old_rate})
+
+#     return render(request,'van_management/freelancevan_rate_change.html',{'form': form,'van': van,'rate_change_history': rate_change_history}
+#     )
+    
+    
+class FreelanceVanRateHistoryView(View):
+    template_name = 'van_management/freelance_van_rate_history.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        van_instance = Van.objects.get(pk=pk)
+        van_rate_instances = FreelanceVehicleRateChange.objects.filter(van=van_instance).order_by('-created_date')
+        other_product_rate_instances = FreelanceVehicleOtherProductChargesChanges.objects.filter(van=van_instance).order_by('-created_date')
+        print("other_product_rate_instances",other_product_rate_instances)
+        
+        last_rate_change = van_rate_instances.first()
+        old_rate = last_rate_change.new_rate if last_rate_change else 0  
+        # Create the form with the old_rate as initial data
+        new_rate_form = FreelanceVehicleRateChangeForm(initial={'old_rate': old_rate})
+        
+        context = {
+            "van_instance": van_instance,
+            "van_rate_instances": van_rate_instances,
+            "new_rate_form": new_rate_form,
+            "other_product_rate_instances": other_product_rate_instances,
+            "product_items": ProdutItemMaster.objects.exclude(product_name="5 gallon")
+        }
+        return render(request, self.template_name, context)
+    
+    def post(self, request, pk, *args, **kwargs):
+        van_instance = Van.objects.get(pk=pk)
+        van_rate_instances = FreelanceVehicleRateChange.objects.filter(van=van_instance).order_by('-created_date')
+         # Ensure that there is at least one instance in van_rate_instances
+        last_rate_change = van_rate_instances.first()
+        old_rate = last_rate_change.new_rate if last_rate_change else 0 
+    
+        form = FreelanceVehicleRateChangeForm(data=request.POST)
+        
+        if form.is_valid():
+            data = form.save(commit=False)
+            data.created_by = str(request.user.username)
+            data.old_rate = old_rate
+            data.van = van_instance
+            data.save()
+            
+            van_instance.rate = data.new_rate
+            van_instance.save()
+            
+            # Log activity for rate update
+            log_activity(
+                created_by=request.user,
+                description=f"Updated rate for van: {van_instance.van_make} (ID: {pk}) to {data.new_rate}"
+            )
+            
+            response_data = {
+                "status": "true",
+                "title": "Successfully Created",
+                "message": "Rate Updated successfully.",
+                'redirect': 'true',
+                "redirect_url": reverse('freelancevan_rate_change', kwargs={'pk': pk})
+            }
+            return HttpResponse(json.dumps(response_data), content_type='application/javascript')
+        else:
+            # Log failed update attempt
+            log_activity(
+                created_by=request.user,
+                description=f"Failed to update rate for van: {van_instance.van_make} (ID: {pk}) due to invalid form data"
+            )
+
+            messages.error(request, 'Invalid form data. Please check the input.')
+
+class FreelanceVanOtherProductRateChangeView(View):
+    def post(self, request, pk, *args, **kwargs):
+        van_instance = get_object_or_404(Van, pk=pk)
+        
+        if not FreelanceVehicleOtherProductCharges.objects.filter(van=van_instance).exists():
+            product_items = ProdutItemMaster.objects.exclude(product_name="5 gallon")
+            print("product_items",product_items)
+            for product_item in product_items:
+                current_rate = request.POST.get(str(product_item.pk))
+                if not current_rate:
+                    continue
+                
+                try:
+                    current_rate = float(current_rate)
+                except ValueError:
+                    continue
+                
+                FreelanceVehicleOtherProductChargesChanges.objects.create(
+                    created_by=request.user,
+                    van=van_instance,
+                    product_item=product_item,
+                    privious_rate=product_item.rate,
+                    current_rate=current_rate
+                )
+                
+                van_charge, created = FreelanceVehicleOtherProductCharges.objects.get_or_create(
+                    van=van_instance,
+                    product_item=product_item,
+                )
+                van_charge.current_rate = current_rate
+                van_charge.save()
+                
+                log_activity(
+                    created_by=request.user,
+                    description=f"Updated rate for van: {van_instance.van_name} (ID: {van_instance.van_id}) to {van_charge.current_rate}"
+                )
+        else:
+            product_item = ProdutItemMaster.objects.get(pk=request.POST.get("other_product_item"))
+            current_rate = request.POST.get("other_product_item_value")
+            current_rate = float(current_rate)
+            
+            FreelanceVehicleOtherProductChargesChanges.objects.create(
+                created_by=request.user,
+                van=van_instance,
+                product_item=product_item,
+                privious_rate=product_item.rate,
+                current_rate=current_rate
+            )
+            
+            van_charge, created = FreelanceVehicleOtherProductCharges.objects.get_or_create(
+                van=van_instance,
+                product_item=product_item,
+            )
+            van_charge.current_rate = current_rate
+            van_charge.save()
+            
+            log_activity(
+                created_by=request.user,
+                description=f"Updated rate for van: {van_instance.van_name} (ID: {van_instance.van_id}) to {van_charge.current_rate}"
+            )
+        
+        response_data = {
+            "status": "true",
+            "title": "Successfully Created",
+            "message": "Rate updated successfully.",
+            'redirect': 'true',
+            "redirect_url": reverse('freelance_van_rate_history', kwargs={'pk': pk})
+        }
+        return JsonResponse(response_data)
+
+def freelance_van_bottle_issue(request, van_id):
+    van = get_object_or_404(Van, van_id=van_id)
+    print("van.branch_id",van.salesman.branch_id)
+    if request.method == 'POST':
+        form = FreelanceVanProductIssueForm(request.POST)
+        
+  
+        if form.is_valid():
+            product = form.cleaned_data.get('product')
+            empty_bottles = form.cleaned_data.get('empty_bottles', 0)
+            extra_bottles = form.cleaned_data.get('extra_bottles', 0)
+            status = form.cleaned_data.get('status')
+            total_bottles_issued = extra_bottles + empty_bottles  
+
+            if total_bottles_issued > van.bottle_count :  
+                messages.error(request, "Bottle count out of range.")
+                return redirect('freelance_van_bottle_issue', van_id=van_id)
+
+            try:
+                with transaction.atomic():
+                    issue = FreelanceVanProductIssue.objects.create(
+                        van=van,
+                        product=product,
+                        empty_bottles=empty_bottles,
+                        extra_bottles=extra_bottles,
+                        total_bottles_issued=total_bottles_issued,
+                        issued_by=request.user.username,
+                        issued_date=now(),
+                        status=status,
+                    )
+                    
+                    # van.bottle_count += total_bottles_issued
+                    # van.save()
+
+                    product_stock = ProductStock.objects.get(
+                        branch=van.salesman.branch_id,
+                        product_name=product,
+                    )
+                    product_stock.quantity -= total_bottles_issued
+                    product_stock.save()
+
+                    van_product_stock, _ = VanProductStock.objects.get_or_create(
+                        created_date=now().date(),
+                        product=product,
+                        van=van,
+                        defaults={'stock': 0}
+                    )
+                    van_product_stock.stock += total_bottles_issued
+                    van_product_stock.save()
+                    
+                    if issue.status == "non_paid":
+                        if product.product_name == "5 Gallon":
+                            product_rate = FreelanceVehicleRateChange.objects.filter(van=van).latest("created_date").new_rate
+                        else:
+                            product_rate = FreelanceVehicleOtherProductCharges.objects.filter(van=van,product_item=product).latest("created_date").current_rate
+                        
+                        new_rate = product_rate
+                        
+                        total_amount = total_bottles_issued * new_rate
+                        outstanding = FreelanceVanOutstanding.objects.create(
+                            van=van,
+                            created_by=request.user.id,
+                            created_date=datetime.now(),
+                            outstanding_amount=total_amount,
+                            )
+
+                    # Log success
+                    log_activity(
+                        created_by=request.user,
+                        description=f"Van Bottle Issue recorded: {van} - {total_bottles_issued} bottles"
+                    )
+
+                    messages.success(request, "Van bottle issue recorded successfully!")
+                    return redirect('freelancevan')  # Redirect to the van list page
+
+            except IntegrityError as e:
+                messages.error(request, f"Integrity error: {str(e)}")
+            except Exception as e:
+                messages.error(request, f"Error: {str(e)}")
+
+        else:
+            messages.error(request, "Invalid form data. Please check your input.")
+
+    else:
+        form = FreelanceVanProductIssueForm()
+
+    context = {
+        'form': form,
+        'van': van,
+        'current_bottle_count': van.bottle_count,
+    }
+    return render(request, 'van_management/freelance_van_bottle_issue.html', context)
+
+def freelance_van_outstanding_details(request, van_id):
+    van = get_object_or_404(Van, van_id=van_id)
+    
+    outstanding = FreelanceVanOutstanding.objects.filter( van=van)
+    
+    context = {
+        'van': van,
+        'outstanding': outstanding,
+    }
+    
+    return render(request, 'van_management/freelance_van_outstanding_details.html', context)
+
+def freelance_van_issue_report(request):
+    vans = Van.objects.filter(van_type="freelance")
+
+    report_data = []
+    for van in vans:
+        total_outstanding = FreelanceVanOutstanding.objects.filter(van=van).aggregate(
+            total_outstanding=Sum('outstanding_amount')
+        )['total_outstanding'] or 0 
+
+        report_data.append({
+            "van": van,
+            "total_outstanding": total_outstanding,
+        })
+
+    context = {
+        "report_data": report_data
+    }
+    return render(request, "van_management/freelance_van_issue_report.html", context)
+
+
+def freelance_van_issue_list(request, van_id):
+    van = get_object_or_404(Van, van_id=van_id)
+    issues = FreelanceVanProductIssue.objects.filter(van=van)
+
+    context = {
+        "van": van,
+        "issues": issues
+    }
+    return render(request, "van_management/freelance_van_issue_list.html", context)
+

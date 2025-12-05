@@ -47,24 +47,14 @@ PAYMENT_CHOICES =(
         ("cheque", "Cheque"),
         ("card", "Card"),
     )
-
-SALES_TYPE_CHOICES = (
-    ('CASH', 'CASH'),
-    ('CREDIT', 'CREDIT'),
-    ('COUPON', 'COUPON'),
-)
-
 class CustodyCustom(models.Model):
     custody_custom_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey('accounts.Customers', on_delete=models.CASCADE,null=True,blank=True)
-    custody_no = models.CharField(max_length=20, null=True, blank=True)
     agreement_no = models.CharField(max_length=20, null=True, blank=True)
     total_amount = models.IntegerField(default=0)
     deposit_type = models.CharField(max_length=20,choices=DEPOSIT_TYPES,null=True,blank=True)
     reference_no = models.CharField(max_length=100)
     amount_collected = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    sales_type = models.CharField(max_length=100, choices=SALES_TYPE_CHOICES, null=True, blank=True)
-    invoice_no = models.CharField(max_length=100, null=True, blank=True)
     
     created_by = models.CharField(max_length=20,  blank=True)
     created_date = models.DateTimeField(auto_now_add=True,blank=True, null=True)
@@ -89,65 +79,6 @@ class CustodyCustom(models.Model):
             self.custody_no = f"{prefix}{new_number}"
 
         super().save(*args, **kwargs)
-        
-    def get_total_custody_qty(self):
-        return CustodyCustomItems.objects.filter(custody_custom=self).aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
-    
-    def get_fgallon_rate(self):
-        fgallon_instance = CustodyCustomItems.objects.filter(custody_custom=self, product__product_name="5 Gallon").first()
-        fgllon_qty = fgallon_instance.quantity
-        fgllon_amount = fgallon_instance.amount
-        
-        if fgllon_amount != 0 and fgllon_qty != 0:
-            return fgllon_amount / fgllon_qty
-        else:
-            return 0
-    
-    def get_product_rate(self):
-        instance = CustodyCustomItems.objects.filter(custody_custom=self).first()
-        qty = instance.quantity
-        amount = instance.amount
-        if amount != 0 and qty != 0:
-            return amount / qty
-        else:
-            return 0
-    
-    def get_fgallon_sub_total(self):
-        fgallon_instance = CustodyCustomItems.objects.filter(custody_custom=self, product__product_name="5 Gallon").first()
-        fgllon_qty = fgallon_instance.quantity
-        fgllon_amount = fgallon_instance.amount
-        return fgllon_amount * fgllon_qty
-    
-    def total_coupon_recieved(self):
-        value_leaf = CustodyCustomCoupon.objects.filter(custody=self).aggregate(Count('leaf'))['leaf__count']
-        value_leaf += CustodyCustomCoupon.objects.filter(custody=self).aggregate(Count('free_leaf'))['free_leaf__count']
-        return {
-            "manual_coupon": value_leaf,
-            "digital_coupon": 0,
-        }
-        
-    def get_product_name(self):
-        return CustodyCustomItems.objects.filter(custody_custom=self).first().product.product_name
-    
-    def outstanding_manual_coupons(self):
-        return OutstandingCoupon.objects.filter(
-            customer_outstanding__customer=self.customer,
-            customer_outstanding__created_date__date=self.created_date.date(),
-            customer_outstanding__invoice_no=self.invoice_no,
-            customer_outstanding__customer__is_deleted = False,
-            # customer_outstanding__customer__is_cancelled = False
-            
-            ).exclude(coupon_type__coupon_type_name="Digital").aggregate(total_count=Sum('count'))['total_count'] or 0
-
-    def outstanding_digital_coupons(self):
-        return OutstandingCoupon.objects.filter(
-            customer_outstanding__customer=self.customer,
-            customer_outstanding__created_date__date=self.created_date.date(),
-            customer_outstanding__invoice_no=self.invoice_no,
-            customer_outstanding__customer__is_deleted = False,
-            # customer_outstanding__customer__is_cancelled = False,
-            coupon_type__coupon_type_name="Digital"
-            ).aggregate(total_count=Sum('count'))['total_count'] or 0
     
 class CustodyCustomItems(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -164,19 +95,7 @@ class CustodyCustomItems(models.Model):
 
     def __str__(self):
         return str(self.id)
-
-class CustodyCustomCoupon(models.Model):
-        id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-        custody = models.ForeignKey(CustodyCustom,on_delete = models.CASCADE)
-        leaf = models.ManyToManyField(CouponLeaflet)
-        free_leaf = models.ManyToManyField(FreeLeaflet)
-
-        class Meta:
-            ordering = ('-id',)
-            
-        def __str__(self):
-            return str(self.custody)
-            
+    
 class CustomerCustodyStock(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey('accounts.Customers', on_delete=models.CASCADE,null=True,blank=True)
@@ -258,7 +177,6 @@ class CustomerReturnReason(models.Model):
 class CustomerReturn(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customers, on_delete=models.CASCADE,null=True,blank=True)
-    return_no = models.CharField(max_length=500, null=True, blank=True)
     agreement_no = models.CharField(max_length=500, null=True, blank=True)
     reference_no = models.CharField(max_length=100, null=True, blank=True)
     deposit_type = models.CharField(max_length=20,choices=DEPOSIT_TYPES,null=True,blank=True)
@@ -283,7 +201,6 @@ class CustomerReturn(models.Model):
             self.return_no = f"{prefix}{new_number}"
 
         super().save(*args, **kwargs)
-
 
 class CustomerReturnItems(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -385,6 +302,8 @@ class CustomerCoupon(models.Model):
     reference_number = models.CharField(max_length=100)
     coupon_method = models.CharField(max_length=10,choices=COUPON_METHOD_CHOICES,default='manual')
     invoice_no = models.CharField(max_length=100, null=True, blank=True)
+    vat_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    amount_before_vat = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     
     created_by = models.CharField(max_length=30, blank=True)
     created_date = models.DateTimeField(auto_now_add=True)
@@ -431,6 +350,7 @@ class CustomerCouponItems(models.Model):
         valueable_leaf = CouponLeaflet.objects.filter(coupon=self.coupon, used=False).count()
         free_leaf = FreeLeaflet.objects.filter(coupon=self.coupon, used=False).count()
         return valueable_leaf + free_leaf
+
     
     def get_available_coupon_count(self):
         valueable_leaf = CouponLeaflet.objects.filter(coupon=self.coupon, used=False).count()
@@ -441,14 +361,14 @@ class CustomerCouponItems(models.Model):
         leafs = CouponLeaflet.objects.filter(coupon=self.coupon,used=False)
         return leafs
     
-    def get_avg_rate(self):
-        rate = 0
-        if self.customer_coupon:
-            if self.coupon:
-                valuable_leaflets = int(self.coupon.valuable_leaflets) 
-                if valuable_leaflets > 0:
-                    rate = round(self.customer_coupon.total_payeble / valuable_leaflets, 2)
-        return rate
+    def get_per_leaf_rate(self):
+        try:
+            valuable_leaflets = int(self.coupon.valuable_leaflets)  # Ensure this field exists in NewCoupon
+            if valuable_leaflets > 0:
+                return self.rate / valuable_leaflets
+        except (ValueError, ZeroDivisionError):
+            return None
+        return None
     
 class CustomerCouponStock(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -529,14 +449,12 @@ class CustomerOutstanding(models.Model):
         return str(self.product_type)
     
     def get_outstanding_count(self):
-        if self.customer and (not self.customer.is_deleted ):
-            if self.product_type == 'amount':
-                return OutstandingAmount.objects.filter(customer_outstanding=self).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-            if self.product_type == 'coupons':
-                return OutstandingCoupon.objects.filter(customer_outstanding=self).aggregate(total_count=Sum('count'))['total_count'] or 0
-            if self.product_type == 'emptycan':
-                return OutstandingProduct.objects.filter(customer_outstanding=self).aggregate(total_empty_bottle=Sum('empty_bottle'))['total_empty_bottle'] or 0
-        return 0
+        if self.product_type == 'amount':
+            return OutstandingAmount.objects.filter(customer_outstanding=self).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        if self.product_type == 'coupons':
+            return OutstandingCoupon.objects.filter(customer_outstanding=self).aggregate(total_count=Sum('count'))['total_count'] or 0
+        if self.product_type == 'emptycan':
+            return OutstandingProduct.objects.filter(customer_outstanding=self).aggregate(total_empty_bottle=Sum('empty_bottle'))['total_empty_bottle'] or 0
 
 class OutstandingAmount(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -601,6 +519,10 @@ class CustomerSupply(models.Model):
     allocate_bottle_to_free = models.PositiveIntegerField(default=0)
     reference_number = models.CharField(max_length=100, null=True, blank=True)
     invoice_no = models.CharField(max_length=100, null=True, blank=True)
+    vat_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    amount_before_vat = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    
+    
     
     created_by = models.CharField(max_length=30, blank=True)
     created_date = models.DateTimeField()
@@ -633,13 +555,23 @@ class CustomerSupply(models.Model):
             "manual_coupon": value_leaf,
             "digital_coupon": CustomerSupplyDigitalCoupon.objects.filter(customer_supply=self).aggregate(total_count=Sum('count'))['total_count'] or 0
         }
-        
-    def get_rate(self):
-        try:
-            invoice_item = InvoiceItems.objects.filter(product_items__product_name="5 Gallon",invoice__customer=self.customer,invoice__invoice_no=self.invoice_no).first()
-            return invoice_item.rate / invoice_item.qty
-        except:
+    @property
+    def rate(self):
+        first_item = self.customersupplyitems_set.first()
+        if not first_item:
             return 0
+        total_qty = self.customersupplyitems_set.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+        total_amount = first_item.amount 
+        return round(total_amount/total_qty,2)
+
+    # def get_rate(self):
+    #     amount = getattr(self, 'amount_recieved', 0) or 0
+    #     # Get the total quantity from related CustomerSupplyItems
+    #     total_qty = self.customersupplyitems_set.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+
+    #     if total_qty > 0:
+    #         return round(amount / total_qty, 2)
+    #     return 0
     
     def outstanding_manual_coupons(self):
         return OutstandingCoupon.objects.filter(
@@ -709,7 +641,19 @@ class CustomerSupply(models.Model):
             if self.amount_recieved <= 0 :
                 sales_type = "CREDIT"
         return sales_type
+    
+    # def get_vat_amount(self):
+    #     if self.subtotal and self.vat:
+    #         price_without_vat = self.subtotal / (1 + (self.vat / 100))
+    #         vat_amount = self.subtotal - price_without_vat
+    #         return round(vat_amount, 2)
+    #     return 0.00
 
+    # def get_amount_before_vat(self):
+    #     if self.subtotal and self.vat:
+    #         amount_before_vat = self.subtotal / (1 + (self.vat / 100))
+    #         return round(amount_before_vat, 2)
+    #     return 0.00
 
 
 class CustomerSupplyItems(models.Model):
@@ -718,7 +662,8 @@ class CustomerSupplyItems(models.Model):
         product = models.ForeignKey(ProdutItemMaster, on_delete=models.CASCADE,null=True,blank=True)
         quantity = models.PositiveIntegerField()
         amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-
+        foc = models.PositiveIntegerField(default=0)
+        rate = models.DecimalField(max_digits=10, decimal_places=2,default=0)
         class Meta:
             ordering = ('-id',)
             
@@ -727,6 +672,123 @@ class CustomerSupplyItems(models.Model):
         
         def leaf_count(self):
             return CustomerSupplyCoupon.objects.filter(customer_supply=self.customer_supply).aggregate(Count('leaf'))['leaf__count']
+        
+
+# class CustomerSupply(models.Model):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     customer = models.ForeignKey('accounts.Customers',on_delete = models.CASCADE)
+#     salesman = models.ForeignKey('accounts.CustomUser', on_delete=models.CASCADE)
+#     grand_total = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     discount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     net_payable = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     vat = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     subtotal = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     amount_recieved = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     collected_empty_bottle = models.PositiveIntegerField(default=0)
+#     allocate_bottle_to_pending = models.PositiveIntegerField(default=0)
+#     allocate_bottle_to_custody = models.PositiveIntegerField(default=0)
+#     allocate_bottle_to_paid = models.PositiveIntegerField(default=0)
+#     allocate_bottle_to_free = models.PositiveIntegerField(default=0)
+#     reference_number = models.CharField(max_length=100, null=True, blank=True)
+#     invoice_no = models.CharField(max_length=100, null=True, blank=True)
+#     vat_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+#     amount_before_vat = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    
+#     created_by = models.CharField(max_length=30, blank=True)
+#     created_date = models.DateTimeField()
+#     modified_by = models.CharField(max_length=20, null=True, blank=True)
+#     modified_date = models.DateTimeField(auto_now=True ,blank=True, null=True)
+    
+#     is_edited = models.BooleanField(default=False)
+#     outstanding_amount_added = models.BooleanField(default=False)
+#     outstanding_coupon_added = models.BooleanField(default=False)
+#     outstanding_bottle_added = models.BooleanField(default=False)
+#     van_stock_added = models.BooleanField(default=False)
+#     van_foc_added = models.BooleanField(default=False)
+#     van_emptycan_added = models.BooleanField(default=False)
+#     custody_added = models.BooleanField(default=False)
+    
+#     payment_mode = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default="cash")
+#     class Meta:
+#         ordering = ('-created_date',)
+#     def __str__(self):
+#         return str(self.customer)
+    
+#     def get_total_supply_qty(self):
+#         return CustomerSupplyItems.objects.filter(customer_supply=self).aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+    
+#     def total_coupon_recieved(self):
+#         value_leaf = CustomerSupplyCoupon.objects.filter(customer_supply=self).aggregate(Count('leaf'))['leaf__count']
+#         value_leaf += CustomerSupplyCoupon.objects.filter(customer_supply=self).aggregate(Count('free_leaf'))['free_leaf__count']
+#         return {
+#             "manual_coupon": value_leaf,
+#             "digital_coupon": CustomerSupplyDigitalCoupon.objects.filter(customer_supply=self).aggregate(total_count=Sum('count'))['total_count'] or 0
+#         }
+        
+#     def get_rate(self):
+#         try:
+#             invoice_item = InvoiceItems.objects.filter(product_items__product_name="5 Gallon",invoice__customer=self.customer,invoice__invoice_no=self.invoice_no).first()
+#             return invoice_item.rate / invoice_item.qty
+#         except:
+#             return 0
+    
+#     def outstanding_manual_coupons(self):
+#         # Assuming CouponLeaflet and FreeLeaflet have a field 'is_used' to track usage
+#         used_coupons = CustomerSupplyCoupon.objects.filter(customer_supply=self).aggregate(
+#             used_manual=Count('leaf', filter=Q(leaf__used=True)),
+#             used_free=Count('free_leaf', filter=Q(free_leaf__used=True))
+#         )
+#         total_manual = self.total_coupon_recieved()["manual_coupon"]
+#         outstanding = total_manual - (used_coupons['used_manual'] + used_coupons['used_free'])
+#         return outstanding
+
+#     def outstanding_digital_coupons(self):
+#         used_digital = CustomerSupplyDigitalCoupon.objects.filter(
+#             customer_supply=self, count__gt=0
+#         ).aggregate(total_used=Sum('count', filter=Q(count__gt=0)))['total_used'] or 0
+#         total_digital = self.total_coupon_recieved()["digital_coupon"]
+#         outstanding = total_digital - used_digital
+#         return outstanding
+    
+#     def is_repeated_customer(self):
+#         # Fetch all supply items related to this customer supply
+#         supply_items = CustomerSupplyItems.objects.filter(customer_supply=self)
+        
+#         for item in supply_items:
+#             # Check if there are other supplies for the same customer, same product, and same date
+#             repeated_supply = CustomerSupplyItems.objects.filter(
+#                 product=item.product,
+#                 customer_supply__customer=self.customer,
+#                 customer_supply__created_date__date=self.created_date.date()
+#             ).exclude(customer_supply=self)  # Exclude the current supply to avoid self-match
+            
+#             # Restrict to supplies from the same customer only
+#             repeated_supply = repeated_supply.filter(customer_supply__customer=self.customer)
+            
+#             # If any match is found, return True
+#             if repeated_supply.exists():
+#                 return True
+        
+#         # If no match is found, return False
+#         return False
+
+
+
+# class CustomerSupplyItems(models.Model):
+#         id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#         customer_supply = models.ForeignKey(CustomerSupply,on_delete = models.CASCADE)
+#         product = models.ForeignKey(ProdutItemMaster, on_delete=models.CASCADE,null=True,blank=True)
+#         quantity = models.PositiveIntegerField()
+#         amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+
+#         class Meta:
+#             ordering = ('-id',)
+            
+#         def __str__(self):
+#             return str(self.customer_supply)
+        
+#         def leaf_count(self):
+#             return CustomerSupplyCoupon.objects.filter(customer_supply=self.customer_supply).aggregate(Count('leaf'))['leaf__count']
         
 class CustomerSupplyCoupon(models.Model):
         id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -962,20 +1024,40 @@ class CustomerOtherProductCharges(models.Model):
         return f"{self.customer.customer_name}"
     
 
-INSTANCE_TYPES_CHOICES = [
-    ("14", "Custody"), 
-]    
-class Approvals(models.Model):
-    instance_id = models.CharField(max_length=200)
-    instance_type = models.CharField(max_length=10, choices=INSTANCE_TYPES_CHOICES)
-    is_approved = models.BooleanField(default=False)
+class CustomerSupplyCheque(models.Model):
+    customer_supply = models.ForeignKey(CustomerSupply, on_delete=models.CASCADE)
+    cheque_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
+    cheque_no = models.CharField(max_length=20)
+    bank_name = models.CharField(max_length=20)
+    cheque_date = models.DateField(null=True, blank=True)
+    STATUS_CHOICES = [
+        ('PENDING', 'PENDING'), 
+        ('CLEARED', 'CLEARED')
+    ]
+    status = models.CharField(max_length=10,choices=STATUS_CHOICES,default='PENDING')
+
+    class Meta:
+        ordering = ('-id',)
+
+    def _str_(self):
+        return f"{self.bank_name} - {self.cheque_no} ({self.status})"
     
-    def __str__(self):
-        return str(self.get_instance_type_display())
-    
-    def get_instance_data(self):
-        if self.instance_type == "14":
-            instance = CustodyCustom.objects.get(pk=self.instance_id)
-            
-        return instance
-   
+class CustomerSupplyCard(models.Model):
+    customer_supply = models.ForeignKey(CustomerSupply, on_delete=models.CASCADE)
+    customer_name = models.CharField(max_length=500, null=True, blank=True)
+    card_number = models.CharField(max_length=255, null=True, blank=True)
+    card_date = models.DateField(null=True, blank=True)
+    card_type = models.CharField(max_length=100, null=True, blank=True)
+    card_category = models.CharField(max_length=100, null=True, blank=True)
+    card_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2, null=True, blank=True)
+    STATUS_CHOICES = [
+        ('PENDING', 'PENDING'),
+        ('CLEARED', 'CLEARED')
+    ]
+    status = models.CharField(max_length=10,choices=STATUS_CHOICES,default='PENDING')
+
+    class Meta:
+        ordering = ('-id',)
+
+    def _str_(self):
+        return f"{self.card_number} ({self.status})"

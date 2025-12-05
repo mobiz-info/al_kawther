@@ -43,16 +43,6 @@
                                             {% comment %} <option value="used" {% if filter_data.status_type == 'used' %}selected{% endif %}>Used</option> {% endcomment %}
                                         </select>                                        
                                     </div>
-                                   
-                                    <div class="col">
-                                        <label for="designation">Route:</label>
-                                        <select name="designation" class="form-select">
-                                            <option value="">All Routes</option>
-                                            {% for route in routes %}
-                                            <option value="{{ route.routes.route_name }}" {% if filter_data.designation == route.routes.route_name %}selected{% endif %}>{{ route.routes.route_name }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div> 
                                     <div class="col">
                                         <label for="route_name">Search:</label>
                                         <input type="text" name="q" class="form-control" placeholder="Search ..." value="{{ filter_data.q }}">

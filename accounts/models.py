@@ -84,6 +84,8 @@ class CustomUser(AbstractUser):
     joining_date = models.DateTimeField(null=True, blank=True)
     passport_expiry = models.DateTimeField(null=True, blank=True)
     passport_number = models.CharField(max_length=50, null=True, blank=True)
+    is_exported = models.BooleanField(default=False)
+    
     #class Meta:
     #    ordering = ('username',)
 
@@ -92,6 +94,18 @@ class CustomUser(AbstractUser):
     
     def get_fullname(self):
         return f'{self.first_name} {self.last_name}'
+
+
+class CustomUserExportStatus(models.Model):
+    emp = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='emp_export_status')
+    erp_emp_id = models.CharField(max_length=50, unique=True)
+    exported_date = models.DateTimeField(auto_now_add=True)  
+    
+    class Meta:
+        ordering = ('-exported_date',)
+
+    def __str__(self):
+        return f"Exported {self.emp.username} with ERP ID {self.erp_emp_id}"    
     
 # Create your models here.
 class Customers(models.Model):
@@ -108,6 +122,7 @@ class Customers(models.Model):
     location = models.ForeignKey('master.LocationMaster', on_delete=models.SET_NULL, null=True, blank=False)
     emirate = models.ForeignKey('master.EmirateMaster', on_delete=models.SET_NULL, null=True, blank=False)
     mobile_no = models.CharField(max_length=250, null=True, blank=True)
+    whatsapp_contry_code = models.CharField(max_length=10, null=True, blank=True)
     whats_app = models.CharField(max_length=250, null=True, blank=True)
     email_id = models.CharField(max_length=250, null=True, blank=True)
     gps_latitude = models.CharField(max_length=100, default=0)
@@ -136,8 +151,11 @@ class Customers(models.Model):
     eligible_foc = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
     gps_module_active = models.BooleanField(default=False)
-    # is_cancelled = models.BooleanField(default=False)
+    is_exported = models.BooleanField(default=False)
+    is_guest = models.BooleanField(default=False)
+    preferred_language = models.CharField(max_length=100,default="EN")
     
+     
     def __str__(self):
         return str(self.customer_name)
     
@@ -153,16 +171,18 @@ class Customers(models.Model):
     @property
     def get_rate(self):
         return self.rate
-    
-    def get_water_rate(self):
-        from decimal import Decimal
 
-        if self.rate != None and Decimal(self.rate) > 0:
-            rate = Decimal(self.rate)
-        else:
-            rate = Decimal(ProdutItemMaster.objects.get(product_name="5 Gallon").rate)
-        return rate
-       
+class CustomerExportStatus(models.Model):
+    customer = models.ForeignKey(Customers, on_delete=models.CASCADE, related_name='customer_export_status')
+    erp_customer_id = models.CharField(max_length=50, unique=True)
+    exported_date = models.DateTimeField(auto_now_add=True)  
+    
+    class Meta:
+        ordering = ('-exported_date',)
+
+    def __str__(self):
+        return f"Exported {self.customer.customer_name} with ERP ID {self.erp_customer_id}"   
+           
 class Staff_Day_of_Visit(models.Model):
     visit_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customers, on_delete=models.SET_NULL, null=True, blank=False)
@@ -364,3 +384,46 @@ class GpsLog(models.Model):
     def __str__(self):
         status = "Enabled" if self.gps_enabled else "Disabled"
         return f"{self.route.route_name} - GPS {status} by {self.user}"
+    
+class WhatsappGuestCustomers(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.CharField(max_length=250)
+    created_date = models.DateTimeField(auto_now_add=True, editable=False)
+    
+    customer_name = models.CharField(max_length=250)
+    building_name = models.CharField(max_length=250)
+    door_house_no =  models.CharField(max_length=250)
+    floor_no = models.CharField(max_length=250)
+    location = models.CharField(max_length=250)
+    emirate = models.CharField(max_length=250)
+    mobile_no = models.CharField(max_length=250, null=True, blank=True)
+    whats_app = models.CharField(max_length=250, null=True, blank=True)
+     
+    def __str__(self):
+        return str(self.customer_name)
+    
+    
+class GuestCustomerOrder(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.CharField(max_length=250)
+    created_date = models.DateTimeField(auto_now_add=True, editable=False)
+    
+    customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
+    product = models.ForeignKey(ProdutItemMaster, on_delete=models.CASCADE)
+    no_bottles_required = models.CharField(max_length=250)
+    delivery_date = models.DateTimeField(blank=True, null=True)
+     
+    def __str__(self):
+        return str(self.customer.customer_name)
+    
+class CustomerComplaints(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.CharField(max_length=250)
+    created_date = models.DateTimeField(auto_now_add=True, editable=False)
+    
+    customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
+    complaint = models.TextField()
+    status = models.CharField(max_length=200, default="pending")
+     
+    def __str__(self):
+        return str(self.customer.customer_name)

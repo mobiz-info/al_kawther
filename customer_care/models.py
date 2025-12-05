@@ -233,33 +233,3 @@ class CustomerRequestCancelReason(models.Model):
 
     def __str__(self):
         return f"Cancel Reason for Request {self.customer_request.id}-{self.reason}"
-
-class CancelReasons(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    reason = models.CharField(max_length=50,default=0)
-
-    created_date = models.DateTimeField(auto_now_add=True)
-    modified_by = models.CharField(max_length=20, null=True, blank=True)
-    modified_date = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        ordering = ('-created_date',)
-
-    def __str__(self):
-        return f"{self.reason}"
-
-class CustomerIscancelledReasons(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    customer = models.ForeignKey(Customers,on_delete=models.SET_NULL, null=True, blank=True)
-    reason = models.ForeignKey(CancelReasons,on_delete=models.SET_NULL, null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
-
-    created_date = models.DateTimeField(auto_now_add=True)
-    modified_by = models.CharField(max_length=20, null=True, blank=True)
-    modified_date = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        ordering = ('-created_date',)
-
-    def __str__(self):
-        return f"Cancel Reason for Request {self.customer.customer_id}-{self.reason}"

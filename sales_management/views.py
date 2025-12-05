@@ -2,9 +2,8 @@
 import json
 import random
 from decimal import Decimal
-from datetime import datetime, timedelta
+from datetime import datetime, date,timedelta
 from apiservices.views import find_customers
-from sales_management.templatetags.sales_templatetags import outstanding_collection_balance
 from van_management.functions import vanstock_curreptions
 from van_management.models import *
 from django.db import IntegrityError
@@ -12,8 +11,9 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.shortcuts import render
-from django.db.models import Q, ExpressionWrapper, Sum, F, ExpressionWrapper, IntegerField
+from django.db.models import Q, ExpressionWrapper
 from django.db.models.functions import Round
+from django.utils.timezone import make_aware
 # from client_management.models import CustodyCustomItems
 from coupon_management.models import AssignStaffCouponDetails
 from master.models import RouteMaster  # Assuming you have imported RouteMaster
@@ -305,7 +305,7 @@ class InitiateSaleView(FormView, View):
         coupon_method = request.GET.get('coupon_method')
         print("coupon_methodcoupon_method", coupon_method)
         # Fetch the customer object
-        customer = Customers.objects.filter(customer_id=customer_id).first()
+        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
         # Check if the customer exists
         # Filter AssignStaffCouponDetails based on customer_id
         assign_staff_coupon_details = AssignStaffCouponDetails.objects.filter(
@@ -372,7 +372,7 @@ class InitiateSaleView(FormView, View):
         sales_type = request.POST.get('sales_type')
         customer_id = request.POST.get('customer_id')
         product_id = request.POST.get('product_id')
-        customer = Customers.objects.filter(customer_id=customer_id).first()
+        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
         product = Product.objects.filter(product_id=product_id).first()
         id_status = request.POST.get('status')
         # Get sales_type from form data
@@ -401,7 +401,7 @@ class InitiateSaleView(FormView, View):
                 print("eeeeeeeeeeeeeeeeeeeeeeeee")
                 invoice_number=request.POST.get('invoice_number')
                 sales_temp_data = SalesTemp.objects.get(invoice_number=invoice_number).data
-                customer = Customers.objects.filter(customer_id=sales_temp_data['customer_id']).first()
+                customer = Customers.objects.filter(is_guest=False, customer_id=sales_temp_data['customer_id']).first()
                 product = Product.objects.filter(product_id=sales_temp_data['product_id']).first()
                 get_tax_percentage= Tax.objects.filter(name="vat").first()
                 vat_value= get_tax_percentage/100
@@ -668,7 +668,7 @@ class PaymentForm(View):
             sales_temp = SalesTemp.objects.create(invoice_number=invoice_number, data=data)
 
         # Fetch the rate from the Customers table based on the customer_id
-        customer = Customers.objects.filter(customer_id=customer_id).first()
+        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
         if customer:
             customer_type = customer.customer_type
             get_customer_default_price = Product_Default_Price_Level.objects.filter(customer_type=customer_type, product_id=product_id).first()
@@ -1206,7 +1206,7 @@ def download_salesreport_excel(request):
 #         table_border_format = workbook.add_format({'border':1})
 #         worksheet.conditional_format(4, 0, len(df.index)+4, len(df.columns) - 1, {'type':'cell', 'criteria': '>', 'value':0, 'format':table_border_format})
 #         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 16, 'border': 1})
-#         worksheet.merge_range('A1:J2', f'Al Kawthar Pure Drinking Water', merge_format)
+#         worksheet.merge_range('A1:J2', f'National Water', merge_format)
 #         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
 #         worksheet.merge_range('A3:J3', f'    Collection Report   ', merge_format)
 #         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
@@ -1277,7 +1277,7 @@ def download_salesreport_excel(request):
 #         table_border_format = workbook.add_format({'border':1})
 #         worksheet.conditional_format(4, 0, len(df.index)+4, len(df.columns) - 1, {'type':'cell', 'criteria': '>', 'value':0, 'format':table_border_format})
 #         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'font_size': 16, 'border': 1})
-#         worksheet.merge_range('A1:J2'National Al Kawthar Pure Drinking Water', merge_format)
+#         worksheet.merge_range('A1:J2'SanaSana Water', merge_format)
 #         merge_format = workbook.add_format({'align': 'center', 'bold': True, 'border': 1})
 #         worksheet.merge_range('A3:J3', f'    Daily Collection Report   ', merge_format)
 #         # worksheet.merge_range('E3:H3', f'Date: {def_date}', merge_format)
@@ -1291,14 +1291,12 @@ def download_salesreport_excel(request):
 #     return response
 
 #------------------Product-Route wise sales report
-
-
+from itertools import chain
 def product_route_salesreport(request):
     template = 'sales_management/product_route_salesreport.html'
     filter_data = {}
 
     selected_product_id = request.GET.get('selected_product_id')
-
     selected_product = None
     if selected_product_id:
         selected_product = get_object_or_404(ProdutItemMaster, id=selected_product_id)
@@ -1308,7 +1306,6 @@ def product_route_salesreport(request):
 
     # Start with all customers
     user_li = Customers.objects.all()
-
     query = request.GET.get("q")
     if query:
         user_li = user_li.filter(
@@ -1329,67 +1326,120 @@ def product_route_salesreport(request):
     customersupplyitems = CustomerSupplyItems.objects.all()
     coupons_collected = CustomerSupplyCoupon.objects.all()
     products = ProdutItemMaster.objects.all()
-    # today = datetime.datetime.today().date()
-    
+
+    # Date filters
     if request.GET.get('start_date'):
         start_date = datetime.datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').date()
     else:
         start_date = datetime.datetime.today().date()
+
     if request.GET.get('end_date'):
         end_date = datetime.datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').date()
     else:
         end_date = datetime.datetime.today().date()
 
     customersupplyitems = customersupplyitems.filter(
-        customer_supply__created_date__date__gte=start_date, customer_supply__created_date__date__lte=end_date
+        customer_supply__created_date__date__gte=start_date,
+        customer_supply__created_date__date__lte=end_date
     )
     coupons_collected = coupons_collected.filter(
-        customer_supply__created_date__date__gte=start_date, customer_supply__created_date__date__lte=end_date,
+        customer_supply__created_date__date__gte=start_date,
+        customer_supply__created_date__date__lte=end_date,
         customer_supply__customer__sales_type='CASH COUPON'
     )
 
-    # Convert to the required format for the HTML date input
+    # Format for HTML input
     filter_data['start_date'] = start_date.strftime('%Y-%m-%d')
     filter_data['end_date'] = end_date.strftime('%Y-%m-%d')
 
-    # Apply product filter if selected_product is provided
-    if selected_product:
-        customersupplyitems = customersupplyitems.filter(product=selected_product)
+    combined_coupons = []
+    totals = {}
 
-    # Apply route filter if route_filter is provided
-    if route_filter:
-        customersupplyitems = customersupplyitems.filter(
-            customer_supply__customer__routes__route_name=route_filter
-        )
-        coupons_collected = coupons_collected.filter(
-            customer_supply__customer__routes__route_name=route_filter,
-            customer_supply__customer__sales_type='CASH COUPON'
-        )
-        filter_data["route_name"] = route_filter
-        
-    totals = customersupplyitems.aggregate(
-        total_quantity=Sum('quantity'),
-        total_empty_bottle=Sum('customer_supply__collected_empty_bottle'),
-        total_amount_collected=Sum('amount'),
-    )
-    
-    total_coupon_collected = CustomerSupplyCoupon.objects.filter(
-        customer_supply__in=customersupplyitems.values('customer_supply')
-    ).annotate(leaf_count=Count('leaf')).aggregate(total=Sum('leaf_count'))['total'] or 0
+    # ✅ If coupons selected
+    if selected_product and selected_product.category and selected_product.category.category_name.lower() == "coupons":
+        customersupplyitems = CustomerSupplyItems.objects.none()  # no direct rows for coupons
 
-    totals['total_coupon_collected'] = total_coupon_collected
-    
+        # manual/free coupons
+        coupons_collected = CustomerSupplyCoupon.objects.filter(
+            customer_supply__created_date__date__gte=start_date,
+            customer_supply__created_date__date__lte=end_date,
+            customer_supply__customer__sales_type="CASH COUPON",
+            leaf__coupon__coupon_type__coupon_type_name=selected_product
+        )
+        if route_filter:
+            coupons_collected = coupons_collected.filter(
+                customer_supply__customer__routes__route_name=route_filter
+            )
+
+        # digital coupons
+        digital_coupons = CustomerSupplyDigitalCoupon.objects.filter(
+            customer_supply__created_date__date__gte=start_date,
+            customer_supply__created_date__date__lte=end_date
+        )
+        if route_filter:
+            digital_coupons = digital_coupons.filter(
+                customer_supply__customer__routes__route_name=route_filter
+            )
+
+        # Merge both into one list for template
+        combined_coupons = list(chain(coupons_collected, digital_coupons))
+
+        # Totals
+        total_manual_coupon = coupons_collected.aggregate(total=Count('leaf'))['total'] or 0
+        total_free_coupon = coupons_collected.aggregate(total=Count('free_leaf'))['total'] or 0
+        total_digital_coupon = digital_coupons.aggregate(total=Sum('count'))['total'] or 0
+
+        totals = {
+            'total_quantity': 0,
+            'total_empty_bottle': coupons_collected.aggregate(
+                total=Sum('customer_supply__collected_empty_bottle')
+            )['total'] or 0,
+            'total_amount_collected': 0,
+            'total_coupon_collected': total_manual_coupon + total_free_coupon + total_digital_coupon,
+            'manual_coupon_total': total_manual_coupon,
+            'free_coupon_total': total_free_coupon,
+            'digital_coupon_total': total_digital_coupon,
+        }
+
+    else:
+        # ✅ Normal product handling
+        if selected_product:
+            customersupplyitems = customersupplyitems.filter(product=selected_product)
+            if route_filter:
+                customersupplyitems = customersupplyitems.filter(
+                    customer_supply__customer__routes__route_name=route_filter
+                )
+
+        totals = customersupplyitems.aggregate(
+            total_quantity=Sum('quantity'),
+            total_empty_bottle=Sum('customer_supply__collected_empty_bottle'),
+            total_amount_collected=Sum('amount'),
+        )
+
+        total_coupon_collected = CustomerSupplyCoupon.objects.filter(
+            customer_supply__in=customersupplyitems.values('customer_supply')
+        ).annotate(
+            leaf_count=Count('leaf')
+        ).aggregate(
+            total=Sum('leaf_count')
+        )['total'] or 0
+
+        totals['total_coupon_collected'] = total_coupon_collected
+
+    # Log activity
     log_activity(
         created_by=request.user,
         description=f"Generated product route sales report with filters: {filter_data}"
     )
+
     context = {
         'customersupplyitems': customersupplyitems.order_by("-customer_supply__created_date"),
         'products': products,
         'filter_data': filter_data,
-        'coupons_collected': coupons_collected,
+        'combined_coupons': combined_coupons,
+        'selected_product': selected_product,
         'route_li': route_li,
-        'totals':totals,
+        'totals': totals,
     }
     return render(request, template, context)
 
@@ -1622,8 +1672,8 @@ def yearmonthsalesreport(request):
     route_li = RouteMaster.objects.all()
 
     route_sales = []
-    current_year = datetime.now().year
-    current_month = datetime.now().month
+    current_year = datetime.datetime.now().year
+    current_month = datetime.datetime.now().month
 
 
     for route in route_li:
@@ -1648,7 +1698,7 @@ def yearmonthsalesreport(request):
 # def yearmonthsalesreportview(request,route_id):
 #     route = RouteMaster.objects.get(route_id = route_id)
 #     print(route,'route')
-#     route_customer = Customers.objects.filter(routes__route_name=route)
+#     route_customer = Customers.objects.filter(is_guest=False, routes__route_name=route)
 #     print(route_customer,'route_customer')
 
 #     context = {
@@ -1658,7 +1708,7 @@ def yearmonthsalesreport(request):
 #     return render(request, 'sales_management/yearmonthsalesreportview.html',context)
 # def yearmonthsalesreportview(request, route_id):
 #     route = RouteMaster.objects.get(route_id=route_id)
-#     route_customers = Customers.objects.filter(routes__route_name=route)
+#     route_customers = Customers.objects.filter(is_guest=False, routes__route_name=route)
 
 #     # Calculate YTD and MTD sales for each customer
 #     today = date.today()
@@ -1688,11 +1738,11 @@ def yearmonthsalesreport(request):
 
 def yearmonthsalesreportview(request, route_id):
     route = RouteMaster.objects.get(route_id=route_id)
-    current_year = datetime.now().year
+    current_year = datetime.datetime.now().year
 
     yearly_sales = CustomerSupply.objects.filter(customer__routes=route, created_date__year=current_year).aggregate(total_sales=Sum('grand_total'))['total_sales'] or 0
 
-    customers = Customers.objects.filter(routes__route_name=route)
+    customers = Customers.objects.filter(is_guest=False, routes__route_name=route)
     monthly_sales = []
     for customer in customers:
         monthly_sales_data = []
@@ -1727,6 +1777,7 @@ def customerSales_report(request):
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
     sales_type_filter = request.GET.get('sales_type')
+    route_filter = request.GET.get('route')
 
     if start_date_str and end_date_str:
         start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -1739,6 +1790,7 @@ def customerSales_report(request):
         'start_date': start_date.strftime('%Y-%m-%d'),
         'end_date': end_date.strftime('%Y-%m-%d'),
         'sales_type': sales_type_filter,
+        'route': route_filter,
     }
 
     # Filter CustomerSupply data
@@ -1749,6 +1801,9 @@ def customerSales_report(request):
     
     if sales_type_filter:
         sales = sales.filter(customer__sales_type=sales_type_filter)
+        
+    if route_filter:
+        sales = sales.filter(customer__routes__pk=route_filter)
     
     sales = sales.order_by("-created_date")
     
@@ -1761,6 +1816,9 @@ def customerSales_report(request):
     
     if sales_type_filter:
         coupons = coupons.filter(payment_type=sales_type_filter)
+    
+    if route_filter:
+        coupons = coupons.filter(customer__routes__pk=route_filter)
 
     coupons = coupons.order_by("-created_date")
 
@@ -1778,7 +1836,7 @@ def customerSales_report(request):
             'building_name': sale.customer.building_name,
             'sales_type': sale.customer.sales_type,
             'route_name': sale.customer.routes.route_name,
-            'salesman': sale.customer.sales_staff.get_fullname() if sale.customer.sales_staff else "",
+            'salesman': sale.customer.sales_staff.get_fullname(),
             'amount': sale.grand_total,
             'discount': sale.discount,
             'net_taxable': sale.subtotal,
@@ -1805,7 +1863,7 @@ def customerSales_report(request):
             'building_name': coupon.customer.building_name,
             'sales_type': coupon.customer.sales_type,
             'route_name': coupon.customer.routes.route_name,
-            'salesman': coupon.customer.sales_staff.get_fullname() if coupon.customer.sales_staff else "",
+            'salesman': coupon.customer.sales_staff.get_fullname(),
             'amount': coupon.grand_total,
             'discount': coupon.discount,
             'net_taxable': coupon.net_amount,
@@ -1831,6 +1889,7 @@ def customerSales_report(request):
         'total_amount_recieved': total_amount_recieved,
         'filter_data': filter_data,
         'sales_types': ['CASH', 'CREDIT'],  # Available filter options
+        'route_li': RouteMaster.objects.all(),
     }
     return render(request, 'sales_management/customerSales_report.html', context)
     # filter_data = {}
@@ -2313,63 +2372,6 @@ def collection_report(request):
     }
 
     return render(request, template, context)
-
-
-def new_collection_report(request):
-    filter_data = {}
-    selected_route_id = request.GET.get('route_name')
-    template = 'sales_management/collection_report.html'
-
-    # Fetch routes and set default date range
-    routes = RouteMaster.objects.all()
-    today = datetime.datetime.today()
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    
-    start_date = today.date()
-    end_date = today.date() + timedelta(days=1)
-    
-    # Parse date filters if provided
-    if start_date_str and end_date_str:
-        start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
-
-    filter_data['start_date'] = start_date.strftime('%Y-%m-%d')
-    filter_data['end_date'] = end_date.strftime('%Y-%m-%d')
-
-    # Fetch collection payments within the date range
-    instances = CollectionPayment.objects.filter(created_date__date__range=[start_date, end_date]).order_by('-created_date')
-    
-    if selected_route_id:
-        selected_route = RouteMaster.objects.get(route_name=selected_route_id)
-        instances = instances.filter(customer__routes__route_name=selected_route.route_name)
-        filter_data['selected_route'] = selected_route_id
-        
-    outstanding_amount = (
-        OutstandingAmount.objects.filter(
-            customer_outstanding__customer__pk__in=instances.values_list("customer__pk"),
-            customer_outstanding__created_date__date__gte=start_date,
-            customer_outstanding__created_date__date__lte=end_date
-        ).aggregate(total_amount=Sum("amount"))["total_amount"]
-        or Decimal("0.00")
-    )
-
-    grand_total_collection_amount = (
-        instances.aggregate(total_amount_received=Sum("amount_received"))["total_amount_received"]
-        or Decimal("0.00")
-    )
-
-    net_outstanding = outstanding_amount - grand_total_collection_amount
-    
-    context = {
-        'instances': instances, 
-        
-        'today': today,
-        'routes': routes, 
-        'filter_data': filter_data,
-    }
-
-    return render(request, template, context)
     # filter_data = {}
     # selected_route_id = request.GET.get('route_name')
     # template = 'sales_management/collection_report.html'
@@ -2426,124 +2428,119 @@ def new_collection_report(request):
 
 
 def collection_report_excel(request):
-    selected_route_id = request.GET.get('route_name')
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
+    selected_route_id = request.GET.get('route_name')
 
-    today = datetime.datetime.today()
-    start_date = today.date()
-    end_date = today.date() + timedelta(days=1)
+    # Set default date range
+    start_date = datetime.datetime.today().date()
+    end_date = datetime.datetime.today().date() + timedelta(days=1)
 
+    # Parse provided dates if available
     if start_date_str and end_date_str:
         start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
-    # Fetch collection payments
-    instances = CollectionPayment.objects.filter(
-        created_date__date__range=[start_date, end_date]
-    ).order_by('-created_date')
+    # Query the filtered data
+    collection_payments = CollectionItems.objects.filter(
+        collection_payment__created_date__date__range=[start_date, end_date]
+    ).values(
+        'collection_payment__customer__custom_id', 
+        'collection_payment__customer__customer_name',
+        'collection_payment__customer__mobile_no',
+        'collection_payment__customer__routes__route_name',
+        'collection_payment__customer__building_name',
+        'collection_payment__customer__door_house_no',
+        'collection_payment__created_date__date',
+        'collection_payment__payment_method',
+        'collection_payment__customer__sales_type'
+    ).annotate(
+        count_amount=Sum('amount'),
+        count_balance=Sum('balance'),
+        count_amount_received=Sum('amount_received')
+    ).order_by('-collection_payment__created_date__date')
 
     if selected_route_id:
-        selected_route = RouteMaster.objects.get(route_name=selected_route_id)
-        instances = instances.filter(customer__routes__route_name=selected_route.route_name)
+        selected_route = get_object_or_404(RouteMaster, route_name=selected_route_id)
+        collection_payments = collection_payments.filter(collection_payment__customer__routes__route_name=selected_route.route_name)
 
-    # Create HttpResponse with Excel content
+    # Create an HttpResponse object with Excel content
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename=collection_report.xlsx'
+    response['Content-Disposition'] = 'attachment; filename=collection_report_filtered.xlsx'
 
+    # Create an Excel workbook and add a worksheet
     workbook = xlsxwriter.Workbook(response, {'in_memory': True})
     worksheet = workbook.add_worksheet()
 
+    # Define the header row
     headers = [
-        'Sl No', 'Date', 'Customer ID', 'Customer/Mobile No', 'Sales Type', 
-        'Route', 'Building Name/No', 'Amount', 'Amount Received', 'Balance', 'Mode of Payment'
+        'Sl No', 'Date & Time', 'Customer/Mobile No', 'Route',
+        'Building Name/No', 'Amount', 'Amount Received', 'Balance', 'Mode of Payment','Sales Type'
     ]
 
-    # Write headers
+    # Write the header row
     for col_num, header in enumerate(headers):
         worksheet.write(0, col_num, header)
 
-    # Write data rows
-    grand_total_amount = Decimal("0.00")
-    grand_total_collected = Decimal("0.00")
-    grand_total_balance = Decimal("0.00")
+    # Write the data rows
+    for row_num, data in enumerate(collection_payments, start=1):
+        worksheet.write(row_num, 0, row_num)  # Sl No
+        worksheet.write(row_num, 1, data['collection_payment__created_date__date'].strftime('%Y-%m-%d'))
+        worksheet.write(row_num, 2, f"{data['collection_payment__customer__customer_name']} ")
+        worksheet.write(row_num, 3, data['collection_payment__customer__routes__route_name'])
+        worksheet.write(row_num, 4, f"{data['collection_payment__customer__building_name']} / {data['collection_payment__customer__door_house_no']}")
+        worksheet.write(row_num, 5, data['count_amount'])
+        worksheet.write(row_num, 6, data['count_amount_received'])
+        worksheet.write(row_num, 7, data['count_balance'])
+        worksheet.write(row_num, 8, data['collection_payment__payment_method'])
+        worksheet.write(row_num, 8, data['collection_payment__customer__sales_type'])
 
-    for row_num, inst in enumerate(instances, start=1):
-        outstanding = outstanding_collection_balance(inst.customer.pk, inst.created_date.date())
-        collected = inst.amount_received or Decimal("0.00")
-        balance = outstanding - collected
-
-        grand_total_amount += outstanding
-        grand_total_collected += collected
-        grand_total_balance += balance
-
-        worksheet.write(row_num, 0, row_num)
-        worksheet.write(row_num, 1, inst.created_date.strftime('%d/%m/%Y'))
-        worksheet.write(row_num, 2, inst.customer.custom_id)
-        worksheet.write(row_num, 3, f"{inst.customer.customer_name} / {inst.customer.mobile_no}")
-        worksheet.write(row_num, 4, inst.customer.get_sales_type_display())
-        worksheet.write(row_num, 5, inst.customer.routes.route_name)
-        worksheet.write(row_num, 6, f"{inst.customer.building_name} / {inst.customer.door_house_no}")
-        worksheet.write(row_num, 7, float(outstanding))
-        worksheet.write(row_num, 8, float(collected))
-        worksheet.write(row_num, 9, float(balance))
-        worksheet.write(row_num, 10, inst.payment_method)
-
-    # Write grand total row
-    total_row = len(instances) + 1
-    worksheet.write(total_row, 6, "Grand Total")
-    worksheet.write(total_row, 7, float(grand_total_amount))
-    worksheet.write(total_row, 8, float(grand_total_collected))
-    worksheet.write(total_row, 9, float(grand_total_balance))
-
+    # Close the workbook and write the data to the response
     workbook.close()
     return response
 
-
 def print_collection_report(request):
-    selected_route_id = request.GET.get('route_name')
     start_date_str = request.GET.get('start_date')
     end_date_str = request.GET.get('end_date')
-    
-    today = datetime.datetime.today()
-    start_date = today.date()
-    end_date = today.date() + timedelta(days=1)
+    selected_route_id = request.GET.get('route_name')
 
+    # Set default date range
+    start_date = datetime.datetime.today().date()
+    end_date = datetime.datetime.today().date() + timedelta(days=1)
+
+    # Parse provided dates if available
     if start_date_str and end_date_str:
         start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
         end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date()
 
-    # Fetch collection payments
-    instances = CollectionPayment.objects.filter(
-        created_date__date__range=[start_date, end_date]
-    ).order_by('-created_date')
+    # Query the filtered data
+    collection_payments = CollectionItems.objects.filter(
+        collection_payment__created_date__date__range=[start_date, end_date]
+    ).values(
+        'collection_payment__customer__custom_id', 
+        'collection_payment__customer__customer_name',
+        'collection_payment__customer__mobile_no',
+        'collection_payment__customer__routes__route_name',
+        'collection_payment__customer__building_name',
+        'collection_payment__customer__door_house_no',
+        'collection_payment__created_date__date',
+        'collection_payment__payment_method',
+        'collection_payment__customer__sales_type'
+    ).annotate(
+        count_amount=Sum('amount'),
+        count_balance=Sum('balance'),
+        count_amount_received=Sum('amount_received')
+    ).order_by('-collection_payment__created_date__date')
 
     if selected_route_id:
-        selected_route = RouteMaster.objects.get(route_name=selected_route_id)
-        instances = instances.filter(customer__routes__route_name=selected_route.route_name)
-
-    # Compute grand totals
-    grand_total_amount = Decimal("0.00")
-    grand_total_collected = Decimal("0.00")
-    grand_total_balance = Decimal("0.00")
-
-    for inst in instances:
-        outstanding = outstanding_collection_balance(inst.customer.pk, inst.created_date.date())
-        collected = inst.amount_received or Decimal("0.00")
-        balance = outstanding - collected
-
-        grand_total_amount += outstanding
-        grand_total_collected += collected
-        grand_total_balance += balance
+        selected_route = get_object_or_404(RouteMaster, route_name=selected_route_id)
+        collection_payments = collection_payments.filter(collection_payment__customer__routes__route_name=selected_route.route_name)
 
     context = {
-        'instances': instances,
+        'collection_payments': collection_payments,
         'start_date': start_date.strftime('%d/%m/%Y'),
         'end_date': end_date.strftime('%d/%m/%Y'),
         'selected_route': selected_route_id,
-        'grand_total_amount': grand_total_amount,
-        'grand_total_collected': grand_total_collected,
-        'grand_total_balance': grand_total_balance,
     }
 
     return render(request, 'sales_management/collection_report_print.html', context)
@@ -3936,7 +3933,7 @@ def dsr_credit_outstanding(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,amount_received__gt=0) 
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         total_amount_received_upto_today = dialy_collections.filter(created_date__date__lte=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - total_amount_received_upto_today
@@ -3993,7 +3990,7 @@ def dsr_credit_outstanding_print(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,amount_received__gt=0) 
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         total_amount_received_upto_today = dialy_collections.filter(created_date__date__lte=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - total_amount_received_upto_today
@@ -4063,7 +4060,7 @@ def visitstatistics_report(request):
             driver_name = driver.get_fullname() if driver else "N/A"
 
             # Calculate statistics for the current route
-            new_customers_count = Customers.objects.filter(
+            new_customers_count = Customers.objects.filter(is_guest=False, 
                 created_date__date__range=[from_date, to_date],
                 sales_staff_id=salesman
             ).count()
@@ -4154,7 +4151,7 @@ def visitstatistics_report_print(request):
             driver_name = driver.get_fullname() if driver else "N/A"
 
             # Calculate statistics for the current route
-            new_customers_count = Customers.objects.filter(
+            new_customers_count = Customers.objects.filter(is_guest=False, 
                 created_date__date__range=[from_date, to_date],
                 sales_staff_id=salesman
             ).count()
@@ -4272,7 +4269,6 @@ def bottlecount_report(request):
 def dsr_summary(request):
     
     filter_data = {}
-    stock_summary = {}
     data_filter = False
     total_count = 0
     non_visited_count = 0
@@ -4285,11 +4281,6 @@ def dsr_summary(request):
     total_supplied_bottles = 0
     emergency_supply_count = 0
     visited_customers_count = 0
-    new_customers_count = 0
-    planned_visit_count = 0
-    visited_customers_count = 0
-    non_visited_count = 0
-    unplanned_count = 0
     cash_total_net_taxable = 0
     cash_total_vat = 0
     cash_total_subtotal = 0
@@ -4309,9 +4300,9 @@ def dsr_summary(request):
     today_payable = 0
     suspense_paid_amount = 0
     suspense_balance_amount = 0
-    outstanding_credit_notes_total_amount = 0
-    outstanding_credit_notes_received_amount = 0
-    outstanding_credit_notes_balance = 0
+    todays_opening_outstanding_amount = 0
+    credit_outstanding_collected_amount = 0
+    outstanding_closing_balance = 0
     outstanding_total_amount_collected = 0
     cash_sales_amount_collected = 0
     credit_sales_amount_collected = 0
@@ -4333,7 +4324,6 @@ def dsr_summary(request):
     total_debit_amount_count = 0
     total_credit_amount_count = 0
     total_coupon_amount_count = 0
-    visited_customer_ids = ""
     
     five_gallon_cash_total_net_taxable = 0
     five_gallon_cash_total_vat = 0
@@ -4366,33 +4356,14 @@ def dsr_summary(request):
     credit_sale_recharge_amount_recieved = 0
     foc_total_quantity = 0
     
-    fgallon_cash_custody_total_total_amount = nonfgallon_cash_custody_total_total_amount = 0
-    
-    extra_bottles = []
-    total_extra_bottle_qty = 0
-    total_extra_bottle_collection = 0
-    total_sum_extra_bottle = 0
-    
-    missed_bottles = []
-    total_missed_bottle_qty = 0
-    total_missed_bottle_collection = 0
-    total_sum_missed_bottle = 0
-    
-    customer_custody_instances = fgallon_credit_custody_instances = fgallon_coupon_custody_instances = nonfgallon_credit_custody_instances = nonfgallon_coupon_custody_instances = CustodyCustom.objects.none
+    customer_custody_instances = CustodyCustom.objects.none
+    collected_amount_from_custody_issue = 0
+    customer_custody_items_fgallon_instances = CustodyCustomItems.objects.none
+    customer_custody_items_fgallon_count = 0
     customer_custody_items_nonfgallon_instances = CustodyCustomItems.objects.none
-    fgallon_custody_instances = nonfgallon_custody_instances = fgallon_cash_custody_instances = nonfgallon_cash_custody_instances = CustodyCustomItems.objects.none
-
-    fgallon_cash_custody_total_quantity = fgallon_cash_custody_total_quantity = total_amount_from_custody_issue = nonfgallon_cash_custody_total_quantity = nonfgallon_credit_custody_total_quantity = fgallon_coupon_custody_total_quantity = fgallon_credit_custody_total_quantity = collected_amount_from_custody_issue = 0
-    nonfgallon_coupon_custody_total_quantity = 0
-    
-    outstanding_amounts = []
-    outstanding_coupons = []
-    outstanding_cans = []
-    
-    cash_custody_items_fgallon_quantity = total_quantity_from_custody_issue = 0
+    customer_custody_items_nonfgallon_count = 0
    
     salesman_id =  ""
-    old_bottles_collected = {}
     van_instances = Van.objects.none
     van_route = Van_Routes.objects.none
     products = ProdutItemMaster.objects.none
@@ -4402,7 +4373,6 @@ def dsr_summary(request):
     coupon_sales = CustomerSupply.objects.none
     foc_customers = CustomerSupply.objects.none
     routes_instances = RouteMaster.objects.all()
-    coupon_items = ProdutItemMaster.objects.none
     customer_coupons = CustomerCoupon.objects.none
     other_cash_sales = CustomerSupply.objects.none
     other_credit_sales = CustomerSupply.objects.none
@@ -4416,10 +4386,6 @@ def dsr_summary(request):
     dialy_collections = InvoiceDailyCollection.objects.none
     pending_bottle_customer_instances = CustomerSupply.objects.none
     
-    customer_return = CustomerReturnItems.objects.none
-    customer_return_qty = 0
-    customer_return_amount = 0
-    
     date = request.GET.get('date')
     route_name = request.GET.get('route_name')
     
@@ -4429,6 +4395,8 @@ def dsr_summary(request):
     else:
         date = datetime.datetime.today().date()
         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
+        
+    yesterday_date = date - datetime.timedelta(days=1)
     
     if route_name:
         data_filter = True
@@ -4438,157 +4406,54 @@ def dsr_summary(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman,is_deleted=False).count()
+        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
-        emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman,customer__is_deleted=False).count()
-        #actual visit
-        # --- Get visited customers ---
-        visited_customers = (
-            CustomerSupply.objects.filter(
-                salesman_id=salesman,
-                created_date__date=date,
-                customer__is_deleted=False,
-                # ,
-            )
-            .values_list("customer_id", flat=True)
-            .distinct()
-        )
-        visited_customers_count = visited_customers.count()
-
-        # --- Visited customers ---
-        visited_customers = (
-            CustomerSupply.objects.filter(
-                salesman_id=salesman,
-                created_date__date=date,
-                customer__is_deleted=False,
-                # ,
-            )
-            .values_list("customer_id", flat=True)
-            .distinct()
-        )
-        visited_customer_ids = set(visited_customers)
-
-        # --- Planned customers ---
-        todays_customers = find_customers(request, str(date), van_route.routes.pk)
-
-        # Handle different data formats
-        if hasattr(todays_customers, "values_list"):
-            planned_customer_ids = set(todays_customers.values_list("id", flat=True))
-        elif isinstance(todays_customers, list):
-            # extract IDs if it's list of dicts
-            planned_customer_ids = {c.get("id") for c in todays_customers if isinstance(c, dict)}
-        else:
-            planned_customer_ids = set()
-
-        planned_visit_count = len(planned_customer_ids)
-
-        # --- Non-visited (planned but not visited) ---
-        non_visited_count = len(planned_customer_ids - visited_customer_ids)
-
-        # --- Unplanned (visited but not planned) ---
-        unplanned_count = len(visited_customer_ids - planned_customer_ids)
-
-        # --- New customers created today ---
-        new_customers_count = Customers.objects.filter(
-            created_date__date=date,
-            is_deleted=False,
-            # 
-        ).count()
-
-        # --- Emergency supply ---
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
+        #actual visit
+        visited_customers_count = CustomerSupply.objects.filter(salesman_id=salesman, created_date__date=date).distinct().count()
+        todays_customers = find_customers(request, str(date), van_route.routes.pk)
+        if todays_customers :
+            planned_visit_count = len(todays_customers)
+        else:
+            planned_visit_count = 0
+        non_visited_count = planned_visit_count - visited_customers_count
         
         ##### stock report #### 
         products = ProdutItemMaster.objects.filter()
         van_instances = Van.objects.get(salesman=salesman)
-        van_product_stock = VanProductStock.objects.filter(created_date=date,van=van_instances)
+        van_product_stock = VanProductStock.objects.filter(created_date=date,van=van_instances,product__product_name="5 Gallon")
         stock_report_total = van_product_stock.aggregate(total_stock=Sum('stock'))['total_stock'] or 0
         # vanstock_curreptions(van_instances.pk,date)
         
-        van_coupons_type_names = VanCouponStock.objects.filter(closing_count__gt=0, van=van_instances).values_list("coupon__coupon_type__coupon_type_name")
-        coupon_items = products.filter(product_name__in=van_coupons_type_names,category__category_name="Coupons")
-        
         #### Bottle Count ####
-        total_empty_bottles = van_product_stock.filter(product__product_name="5 Gallon").aggregate(totalempty_bottle=Sum('empty_can_count'))['totalempty_bottle'] or 0
-        total_supplied_bottles =  van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_sold=Sum('sold_count'))['total_sold'] or 0
-        pending_bottle_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_pending=Sum('pending_count'))['total_pending'] or 0
-        damage_bottle_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_damage=Sum('damage_count'))['total_damage'] or 0
-        closing_stock_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_closing=Sum('closing_count'))['total_closing'] or 0
-        total_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_stock=Sum('stock'))['total_stock'] or 0
-        
-        # *************************************** #
-        # *************************************** #
-        # Custody Issue 
-        customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date, customer__routes=van_route.routes, customer__is_deleted=False,  sales_type__isnull=False)
-        total_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        collected_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('amount_collected'))['total_amount'] or 0
-        # 5 gallon custody instances
-        fgallon_custody_instances = customer_custody_instances.filter(custodycustomitems__product__product_name="5 Gallon")
-        
-        fgallon_cash_custody_instances = fgallon_custody_instances.filter(sales_type="CASH")
-        fgallon_cash_custody_total_quantity = fgallon_cash_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_cash_custody_total_total_amount = fgallon_cash_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        fgallon_cash_custody_total_total_collected = fgallon_cash_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        fgallon_credit_custody_instances = fgallon_custody_instances.filter(sales_type="CREDIT")
-        fgallon_credit_custody_total_quantity = fgallon_credit_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_credit_custody_total_total_amount = fgallon_credit_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        fgallon_credit_custody_total_total_collected = fgallon_credit_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        fgallon_coupon_custody_instances = fgallon_custody_instances.filter(sales_type="COUPON")
-        fgallon_coupon_custody_total_quantity = fgallon_coupon_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_coupon_custody_total_total_collected = fgallon_coupon_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        # non 5 gallon custody instances
-        nonfgallon_custody_instances = customer_custody_instances.exclude(custodycustomitems__product__product_name="5 Gallon")
-        
-        nonfgallon_cash_custody_instances = nonfgallon_custody_instances.filter(sales_type="CASH")
-        nonfgallon_cash_custody_total_quantity = nonfgallon_cash_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_cash_custody_total_total_amount = nonfgallon_cash_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_cash_custody_total_total_collected = nonfgallon_cash_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        nonfgallon_credit_custody_instances = nonfgallon_custody_instances.filter(sales_type="CREDIT")
-        nonfgallon_credit_custody_total_quantity = nonfgallon_credit_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_credit_custody_total_total_amount = nonfgallon_credit_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_credit_custody_total_total_collected = nonfgallon_credit_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        nonfgallon_coupon_custody_instances = nonfgallon_custody_instances.filter(sales_type="COUPON")
-        nonfgallon_coupon_custody_total_quantity = nonfgallon_coupon_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_coupon_custody_total_total_amount = nonfgallon_coupon_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_coupon_custody_total_total_collected = nonfgallon_coupon_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        # *************************************** #
-        # *************************************** #
+        total_empty_bottles = van_product_stock.aggregate(totalempty_bottle=Sum('empty_can_count'))['totalempty_bottle'] or 0
+        total_supplied_bottles =  van_product_stock.aggregate(total_sold=Sum('sold_count'))['total_sold'] or 0
+        pending_bottle_count = van_product_stock.aggregate(total_pending=Sum('pending_count'))['total_pending'] or 0
+        damage_bottle_count = van_product_stock.aggregate(total_damage=Sum('damage_count'))['total_damage'] or 0
+        closing_stock_count = van_product_stock.aggregate(total_closing=Sum('closing_count'))['total_closing'] or 0
+        total_count = van_product_stock.aggregate(total_stock=Sum('stock'))['total_stock'] or 0
         
         #### coupon sales count ####
-        customer_coupons=CustomerCoupon.objects.filter(salesman=salesman,created_date__date=date,customer__is_deleted=False)
+        customer_coupons=CustomerCoupon.objects.filter(salesman=salesman,created_date__date=date)
         
-        five_gallon_supply = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon",customer_supply__customer__is_deleted=False).values_list('customer_supply__pk', flat=True)
-        other_supply = CustomerSupplyItems.objects.filter(customer_supply__customer__is_deleted=False).exclude(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
+        five_gallon_supply = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
+        other_supply = CustomerSupplyItems.objects.exclude(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
         ### Cash Sales Start ###
-        five_gallon_cash_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False).exclude(customer__sales_type="CASH COUPON")
-        other_cash_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False).exclude(customer__sales_type="CASH COUPON")
+        five_gallon_cash_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
+        other_cash_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
         # Aggregating for five_gallon_cash_sales
         five_gallon_cash_total_net_taxable = five_gallon_cash_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        five_gallon_cash_total_net_taxable = five_gallon_cash_total_net_taxable + fgallon_cash_custody_total_total_amount 
         five_gallon_cash_total_vat = five_gallon_cash_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         five_gallon_cash_total_subtotal = five_gallon_cash_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        five_gallon_cash_total_subtotal = five_gallon_cash_total_subtotal + fgallon_cash_custody_total_total_amount
         five_gallon_cash_total_received = five_gallon_cash_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        five_gallon_cash_total_received = five_gallon_cash_total_received + fgallon_cash_custody_total_total_collected
         five_gallon_cash_total_quantity = five_gallon_cash_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        five_gallon_cash_total_quantity = five_gallon_cash_total_quantity + fgallon_cash_custody_total_quantity
 
         # Aggregating for other_cash_sales (corrected to use other_cash_sales)
         other_cash_total_net_taxable = other_cash_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        other_cash_total_net_taxable = other_cash_total_net_taxable + nonfgallon_cash_custody_total_total_amount
         other_cash_total_vat = other_cash_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         other_cash_total_subtotal = other_cash_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        other_cash_total_subtotal = other_cash_total_subtotal + nonfgallon_cash_custody_total_total_amount
         other_cash_total_received = other_cash_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        other_cash_total_received = other_cash_total_received + nonfgallon_cash_custody_total_total_collected
         other_cash_total_quantity = other_cash_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        other_cash_total_quantity = other_cash_total_quantity + nonfgallon_cash_custody_total_quantity
 
         # Combining both cash sales querysets
         cash_sales = five_gallon_cash_sales.union(other_cash_sales)
@@ -4598,7 +4463,7 @@ def dsr_summary(request):
         cash_total_received = five_gallon_cash_total_received + other_cash_total_received
         cash_total_quantity = five_gallon_cash_total_quantity + other_cash_total_quantity
         
-        recharge_cash_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False)
+        recharge_cash_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__gt=0)
         cash_sale_recharge_net_payeble = recharge_cash_sales.aggregate(total_net_amount=Sum('net_amount'))['total_net_amount'] or 0
         cash_sale_recharge_vat_total = 0
         cash_sale_recharge_grand_total = recharge_cash_sales.aggregate(total_grand_total=Sum('grand_total'))['total_grand_total'] or 0
@@ -4616,30 +4481,22 @@ def dsr_summary(request):
         ### Cash Sales End ###
         
         ### credit sales Start ####
-        five_gallon_credit_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
-        other_credit_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+        five_gallon_credit_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+        other_credit_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
         
         # Aggregating for five_gallon_credit_sales
         five_gallon_credit_total_net_taxable = five_gallon_credit_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        five_gallon_credit_total_net_taxable = five_gallon_credit_total_net_taxable + fgallon_credit_custody_total_total_amount
         five_gallon_credit_total_vat = five_gallon_credit_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         five_gallon_credit_total_subtotal = five_gallon_credit_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        five_gallon_credit_total_subtotal = five_gallon_credit_total_subtotal + fgallon_credit_custody_total_total_amount
         five_gallon_credit_total_received = five_gallon_credit_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        five_gallon_credit_total_received = five_gallon_credit_total_received + fgallon_credit_custody_total_total_collected
         five_gallon_credit_total_quantity = five_gallon_credit_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        five_gallon_credit_total_quantity = five_gallon_credit_total_quantity + fgallon_credit_custody_total_quantity
 
         # Aggregating for other_credit_sales (corrected to use other_credit_sales)
         other_credit_total_net_taxable = other_credit_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        other_credit_total_net_taxable = other_credit_total_net_taxable + nonfgallon_credit_custody_total_total_amount
         other_credit_total_vat = other_credit_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         other_credit_total_subtotal = other_credit_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        other_credit_total_subtotal = other_credit_total_subtotal + nonfgallon_credit_custody_total_total_amount
         other_credit_total_received = other_credit_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        other_credit_total_received = other_credit_total_received + nonfgallon_credit_custody_total_total_collected
         other_credit_total_quantity = other_credit_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        other_credit_total_quantity = other_credit_total_quantity + nonfgallon_credit_custody_total_quantity
         
         # Combining both cash sales querysets
         credit_sales = five_gallon_credit_sales.union(other_credit_sales)
@@ -4649,7 +4506,7 @@ def dsr_summary(request):
         credit_total_received = five_gallon_credit_total_received + other_credit_total_received
         credit_total_quantity = five_gallon_credit_total_quantity + other_credit_total_quantity
         
-        recharge_credit_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False)
+        recharge_credit_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__lte=0)
         credit_sale_recharge_net_payeble = recharge_credit_sales.aggregate(total_net_amount=Sum('net_amount'))['total_net_amount'] or 0
         credit_sale_recharge_vat_total = 0
         credit_sale_recharge_grand_total = recharge_credit_sales.aggregate(total_grand_total=Sum('grand_total'))['total_grand_total'] or 0
@@ -4666,52 +4523,17 @@ def dsr_summary(request):
         ### credit sales End ####
         
         # Coupon sales
-        coupon_sales = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,customer__sales_type="CASH COUPON",customer__is_deleted=False)
+        coupon_sales = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,customer__sales_type="CASH COUPON")
         for sale in coupon_sales:
             sale.outstanding_manual_coupons = sale.outstanding_manual_coupons()
             sale.outstanding_digital_coupons = sale.outstanding_digital_coupons()
-        manual_coupon_total = (
-            CustomerSupplyCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_leaf=Count('leaf'))['total_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustomerSupplyCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_free_leaf=Count('free_leaf'))['total_free_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustodyCustomCoupon.objects.filter(
-                custody__in=fgallon_coupon_custody_instances
-            ).aggregate(total_leaf=Count('leaf'))['total_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustodyCustomCoupon.objects.filter(
-                custody__in=fgallon_coupon_custody_instances
-            ).aggregate(total_free_leaf=Count('free_leaf'))['total_free_leaf'] or 0
-        )
-
-        digital_coupon_total = (
-            CustomerSupplyDigitalCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_count=Sum('count'))['total_count'] or 0
-        )
-
+        manual_coupon_total = CustomerSupplyCoupon.objects.filter(customer_supply__in=coupon_sales).aggregate(Count('leaf'))['leaf__count']
+        digital_coupon_total = CustomerSupplyDigitalCoupon.objects.filter(customer_supply__in=coupon_sales).aggregate(total_count=Sum('count'))['total_count'] or 0
         
         total_coupon_sales_count = coupon_sales.count()
         
         total_sales_count = total_cash_sales_count + total_credit_sales_count + total_coupon_sales_count
         coupon_total_qty = coupon_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        coupon_total_qty = coupon_total_qty + fgallon_coupon_custody_total_quantity + nonfgallon_coupon_custody_total_quantity 
         
         # Calculate total outstanding digital and manual coupons
         total_outstandaing_manual_coupons = sum(sale.outstanding_manual_coupons for sale in coupon_sales)
@@ -4732,34 +4554,52 @@ def dsr_summary(request):
         suspense_balance_amount = today_payable - suspense_paid_amount
         
         # collection details
-        dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,customer__is_deleted=False)
+        dialy_collections = CollectionPayment.objects.filter(customer__routes__route_name=route_name,customer__is_guest=False)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
-        outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes,customer_outstanding__customer__is_deleted=False).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-        dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-        outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
-        outstanding_credit_notes_received_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-        outstanding_credit_notes_balance = outstanding_credit_notes_total_amount - outstanding_credit_notes_received_amount
-        outstanding_total_amount_collected = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-
+        outstanding_amount_upto_yesterday = OutstandingAmount.objects.filter(customer_outstanding__product_type="amount",customer_outstanding__created_date__date__lte=yesterday_date,customer_outstanding__customer__routes__route_name=route_name,customer_outstanding__customer__is_guest=False).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        dialy_colection_upto_yesterday = dialy_collections.filter(created_date__date__lte=yesterday_date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        todays_opening_outstanding_amount = outstanding_amount_upto_yesterday - dialy_colection_upto_yesterday
+        credit_outstanding_collected_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        outstanding_closing_balance = todays_opening_outstanding_amount + credit_total_subtotal - credit_outstanding_collected_amount
         
+        print(outstanding_amount_upto_yesterday)
+        print(dialy_colection_upto_yesterday)
+        print(credit_outstanding_collected_amount)
         # pending customers
-        pending_bottle_customer_instances = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,allocate_bottle_to_pending__gt=0,customer__is_deleted=False)
+        pending_bottle_customer_instances = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,allocate_bottle_to_pending__gt=0)
         # 5 gallon rate based
         customer_supplies = CustomerSupply.objects.filter(created_date__date=date,salesman_id=salesman_id)
         invoice_nos = customer_supplies.values_list('invoice_no', flat=True)
         invoice_items = InvoiceItems.objects.filter(invoice__invoice_no__in=invoice_nos)
+
         rate_expr = ExpressionWrapper(
             F('rate') / F('qty'),
             output_field=DecimalField(max_digits=10, decimal_places=2)
         )
+
+        # Annotate with calculated_rate
         invoice_items = invoice_items.annotate(calculated_rate=Round(rate_expr, 2))
+
+        # ✅ Exclude zero or null values
+        invoice_items = invoice_items.exclude(calculated_rate__isnull=True).exclude(calculated_rate=0)
+
+        # Get unique non-zero rates
         unique_amounts = set(invoice_items.values_list('calculated_rate', flat=True))
         # unique_amounts = set(CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon").values_list('customer_supply__customer__rate', flat=True))
-        five_gallon_rate_wise_instances = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon",customer_supply__customer__is_deleted=False,)
+        five_gallon_rate_wise_instances = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon")
         total_debit_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__amount_recieved__gt=0).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
         total_credit_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__amount_recieved=0).exclude(customer_supply__customer__sales_type__in=["FOC","CASH COUPON"]).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
         total_coupon_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__customer__sales_type="CASH COUPON").aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        # Custody Issue 
+        customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date,customer__routes=van_route.routes)
+        collected_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('amount_collected'))['total_amount'] or 0
+        
+        customer_custody_items_fgallon_instances = CustodyCustomItems.objects.filter(custody_custom__pk__in=customer_custody_instances.values_list('pk'),product__product_name="5 Gallon")
+        customer_custody_items_fgallon_count = customer_custody_items_fgallon_instances.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+        # custody other products
+        customer_custody_items_nonfgallon_instances = CustodyCustomItems.objects.filter(custody_custom__pk__in=customer_custody_instances.values_list('pk')).exclude(product__product_name="5 Gallon")
+        customer_custody_items_nonfgallon_count = customer_custody_items_nonfgallon_instances.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
         
         # cash sales amount collected
         supply_amount_collected = cash_total_amount_recieved
@@ -4769,16 +4609,16 @@ def dsr_summary(request):
         credit_sales_amount_collected = dialy_collections.aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         total_sales_amount_collected = cash_sales_amount_collected + credit_sales_amount_collected
         
-        cheque_collection = CollectionPayment.objects.filter(payment_method="CHEQUE",created_date__date=date,salesman=salesman,customer__is_deleted = False, )
+        cheque_collection = CollectionPayment.objects.filter(payment_method="CHEQUE",created_date__date=date,salesman=salesman)
         no_of_collected_cheque = cheque_collection.count()
         collected_cheque_amount = cheque_collection.aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         
-        balance_in_hand = total_sales_amount_collected - collected_cheque_amount - today_expense
-        net_payble = total_sales_amount_collected - today_expense
+        balance_in_hand = total_sales_amount_collected + collected_amount_from_custody_issue - collected_cheque_amount - today_expense
+        net_payble = total_sales_amount_collected + collected_amount_from_custody_issue - today_expense
         
         foc_customers = (
-            CustomerSupply.objects.filter(created_date__date=date, customer__sales_type='FOC', salesman=salesman,customer__is_deleted = False, ) |
-            CustomerSupply.objects.filter(created_date__date=date, salesman=salesman, allocate_bottle_to_free__gt=0,customer__is_deleted = False, )
+            CustomerSupply.objects.filter(created_date__date=date, customer__sales_type='FOC', salesman=salesman) |
+            CustomerSupply.objects.filter(created_date__date=date, salesman=salesman, allocate_bottle_to_free__gt=0)
         )
         for foc in foc_customers:
             if foc.allocate_bottle_to_free != 0:
@@ -4787,85 +4627,20 @@ def dsr_summary(request):
                 foc_total_quantity =foc_total_quantity + foc.get_total_supply_qty()
                 
         damage_bottle_instances = VanSaleDamage.objects.filter(van=van_instances,created_date__date=date)
-        #outstanding
-        today = timezone.now().date()
-        amount_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='amount', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in amount_entries:
-            if o.customer:
-                outstanding_amounts.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-
-        coupon_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='coupons', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in coupon_entries:
-            if o.customer:
-                outstanding_coupons.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-
-        can_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='emptycan', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in can_entries:
-            if o.customer:
-                outstanding_cans.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-                
-        customer_supply_item_details = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,customer_supply__customer__is_deleted=False,)
-
-        for cs_item in customer_supply_item_details:
-            item_quantity = cs_item.quantity or 0
-            item_foc_qty = cs_item.customer_supply.allocate_bottle_to_free or 0
-            item_collected_qty = cs_item.customer_supply.collected_empty_bottle or 0
-
-            expected_total = item_quantity + item_foc_qty
-            excess_bottle = item_collected_qty - expected_total
-
-            if excess_bottle > 0:
-                extra_bottles.append(cs_item)
-                total_sum_extra_bottle += excess_bottle
-            elif excess_bottle < 0:
-                missed_bottles.append(cs_item)
-                total_sum_missed_bottle += abs(excess_bottle)
-                
-        customer_return = CustomerReturnItems.objects.filter(customer_return__created_date__date=date,customer_return__customer__routes__route_name=route_name)
-        customer_return_qty = customer_return.aggregate(total_count=Sum('quantity'))['total_count'] or 0
-        customer_return_amount = customer_return.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         
-        total_quantity_from_custody_issue = customer_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-
     context = {
         'van_route': van_route,
         'data_filter': data_filter,
         'salesman_id': salesman_id,
         # visit statistics
         'routes_instances': routes_instances,
-        "new_customers_count": new_customers_count,
-        "planned_visit_count": planned_visit_count,
-        "visited_customers_count": len(visited_customer_ids),
-        "non_visited_count": non_visited_count,
-        "unplanned_count": unplanned_count,
-        "emergency_supply_count": emergency_supply_count,
+        'non_visited_count': non_visited_count,
+        'planned_visit_count': planned_visit_count,
+        'new_customers_count': new_customers_count,
+        'emergency_supply_count': emergency_supply_count,
+        'visited_customers_count': visited_customers_count,
         # stock report
         'products': products,
-        'coupon_items': coupon_items,
         'van_instances': van_instances,
         'van_product_stock': van_product_stock,
         'stock_report_total': stock_report_total,
@@ -4885,7 +4660,7 @@ def dsr_summary(request):
         'five_gallon_cash_total_vat': five_gallon_cash_total_vat,
         'five_gallon_cash_total_subtotal': five_gallon_cash_total_subtotal,
         'five_gallon_cash_total_received': five_gallon_cash_total_received,
-        'five_gallon_cash_total_quantity': five_gallon_cash_total_quantity + cash_custody_items_fgallon_quantity,
+        'five_gallon_cash_total_quantity': five_gallon_cash_total_quantity,
         'five_gallon_cash_total_net_taxable': five_gallon_cash_total_net_taxable,
         # other cash sales
         'other_cash_sales': other_cash_sales,
@@ -4900,7 +4675,6 @@ def dsr_summary(request):
         'cash_sale_recharge_grand_total': cash_sale_recharge_grand_total,
         'cash_sale_recharge_net_payeble': cash_sale_recharge_net_payeble,
         'cash_sale_recharge_amount_recieved': cash_sale_recharge_amount_recieved,
-        'cash_sale_recharge_count':cash_sale_recharge_count,
         
         'cash_total_vat':cash_total_vat,
         'cash_total_qty': cash_total_qty,
@@ -4944,10 +4718,10 @@ def dsr_summary(request):
         'in_hand_amount': in_hand_amount,
         'suspense_paid_amount': suspense_paid_amount,
         'suspense_balance_amount': suspense_balance_amount,
-        'outstanding_credit_notes_balance': outstanding_credit_notes_balance,
+        'outstanding_closing_balance': outstanding_closing_balance,
         'outstanding_total_amount_collected':outstanding_total_amount_collected,
-        'outstanding_credit_notes_total_amount' : outstanding_credit_notes_total_amount,
-        'outstanding_credit_notes_received_amount' : outstanding_credit_notes_received_amount,
+        'todays_opening_outstanding_amount' : todays_opening_outstanding_amount,
+        'credit_outstanding_collected_amount' : credit_outstanding_collected_amount,
         # 5 gallon rate based
         'five_gallon_rates': unique_amounts,
         'total_debit_amount_count': total_debit_amount_count,
@@ -4964,66 +4738,29 @@ def dsr_summary(request):
         'cash_sales_amount_collected': cash_sales_amount_collected,
         'total_sales_amount_collected': total_sales_amount_collected,
         'credit_sales_amount_collected': credit_sales_amount_collected,
-         # custody details
+        # custody details
         'customer_custody_instances': customer_custody_instances,
-        'total_amount_from_custody_issue': total_amount_from_custody_issue,
         'collected_amount_from_custody_issue': collected_amount_from_custody_issue,
-        # custody intances
-        'fgallon_custody_instances': fgallon_custody_instances,
-        
-        'fgallon_cash_custody_instances': fgallon_cash_custody_instances,
-        'fgallon_cash_custody_total_quantity': fgallon_cash_custody_total_quantity,
-        
-        'fgallon_credit_custody_instances': fgallon_credit_custody_instances,
-        'fgallon_credit_custody_total_quantity': fgallon_credit_custody_total_quantity,
-        
-        'fgallon_coupon_custody_instances': fgallon_coupon_custody_instances,
-        'fgallon_coupon_custody_total_quantity': fgallon_coupon_custody_total_quantity,
-        
-        'nonfgallon_custody_instances': nonfgallon_custody_instances,
-        
-        'nonfgallon_cash_custody_instances': nonfgallon_cash_custody_instances,
-        'nonfgallon_cash_custody_total_quantity': nonfgallon_cash_custody_total_quantity,
-        
-        'nonfgallon_credit_custody_instances': nonfgallon_credit_custody_instances,
-        'nonfgallon_credit_custody_total_quantity': nonfgallon_credit_custody_total_quantity,
-        
-        'nonfgallon_coupon_custody_instances': nonfgallon_coupon_custody_instances,
-        'nonfgallon_coupon_custody_total_quantity': nonfgallon_coupon_custody_total_quantity,
-        
+        'customer_custody_items_fgallon_instances': customer_custody_items_fgallon_instances,
+        'customer_custody_items_fgallon_count': customer_custody_items_fgallon_count,
         'customer_custody_items_nonfgallon_instances': customer_custody_items_nonfgallon_instances,
-        'total_quantity_from_custody_issue': total_quantity_from_custody_issue,
+        'customer_custody_items_nonfgallon_count': customer_custody_items_nonfgallon_count,
         
-        # custody return
-        'customer_return': customer_return,
-        'customer_return_qty': customer_return_qty,
-        'customer_return_amount': customer_return_amount,
         'damage_bottle_instances': damage_bottle_instances,
         
-        'extra_bottles': extra_bottles,
-        'total_extra_bottle_qty': total_extra_bottle_qty,
-        'total_extra_bottle_collection': total_extra_bottle_collection,
-        'total_sum_extra_bottle': total_sum_extra_bottle,
-        
-        'missed_bottles': missed_bottles,
-        'total_missed_bottle_qty': total_missed_bottle_qty,
-        'total_missed_bottle_collection': total_missed_bottle_collection,
-        'total_sum_missed_bottle': total_sum_missed_bottle,
-        
-        'net_payble': net_payble ,
-        'balance_in_hand': balance_in_hand ,
+        'net_payble': net_payble,
+        'balance_in_hand': balance_in_hand,
         
         'filter_data': filter_data,
         # FOC customer
         'foc_customers':foc_customers,
         'foc_total_quantity':foc_total_quantity,
         
-        'outstanding_amounts': outstanding_amounts,
-        'outstanding_coupons': outstanding_coupons,
-        'outstanding_cans': outstanding_cans,
     }
     
     return render(request, 'sales_management/dsr_summary.html', context)
+
+
 
 def dsr_summary1(request):
     
@@ -5137,13 +4874,13 @@ def dsr_summary1(request):
     five_gallon_credit_sales = CustomerSupply.objects.none
     dialy_collections = InvoiceDailyCollection.objects.none
     pending_bottle_customer_instances = CustomerSupply.objects.none
-    salesman_instances = CustomUser.objects.filter(
-        Q(user_type='Salesman') | Q(user_type='marketing_executive')
-    )
     
     date = request.GET.get('date')
-    salesman_id = request.GET.get('salesman_id')
+    route_name = request.GET.get('route_name')
+    salesman_id = request.GET.get("salesman_id")
     
+    if salesman_id:
+        filter_data["salesman_id"] = salesman_id
     if date:
         date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
@@ -5151,15 +4888,20 @@ def dsr_summary1(request):
         date = datetime.datetime.today().date()
         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
     
-    if salesman_id:
+    if route_name:
         data_filter = True
+        van_route = Van_Routes.objects.filter(routes__route_name=route_name).first()
         
-        van_route = Van_Routes.objects.filter(van__salesman=salesman_id).first()
-        salesman = van_route.van.salesman
-        salesman_id = salesman.pk
-        filter_data['salesman_id'] = salesman_id
+        if van_route and van_route.van:
+            salesman = van_route.van.salesman
+            # salesman_id = salesman.pk
+            filter_data["route_name"] = route_name
+    
+    
+    
+    
         #new customers created
-        new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -5309,7 +5051,7 @@ def dsr_summary1(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
@@ -5324,11 +5066,19 @@ def dsr_summary1(request):
         customer_supplies = CustomerSupply.objects.filter(created_date__date=date,salesman_id=salesman_id)
         invoice_nos = customer_supplies.values_list('invoice_no', flat=True)
         invoice_items = InvoiceItems.objects.filter(invoice__invoice_no__in=invoice_nos)
+
         rate_expr = ExpressionWrapper(
             F('rate') / F('qty'),
             output_field=DecimalField(max_digits=10, decimal_places=2)
         )
+
+        # Annotate with calculated_rate
         invoice_items = invoice_items.annotate(calculated_rate=Round(rate_expr, 2))
+
+        # ✅ Exclude zero or null values
+        invoice_items = invoice_items.exclude(calculated_rate__isnull=True).exclude(calculated_rate=0)
+
+        # Get unique non-zero rates
         unique_amounts = set(invoice_items.values_list('calculated_rate', flat=True))
         # unique_amounts = set(CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon").values_list('customer_supply__customer__rate', flat=True))
         five_gallon_rate_wise_instances = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon")
@@ -5367,7 +5117,7 @@ def dsr_summary1(request):
         'van_route': van_route,
         'data_filter': data_filter,
         'salesman_id': salesman_id,
-        'salesman_instances':salesman_instances,
+        # 'salesman_instances':salesman_instances,
         # visit statistics
         'routes_instances': routes_instances,
         'non_visited_count': non_visited_count,
@@ -5411,7 +5161,6 @@ def dsr_summary1(request):
         'cash_sale_recharge_grand_total': cash_sale_recharge_grand_total,
         'cash_sale_recharge_net_payeble': cash_sale_recharge_net_payeble,
         'cash_sale_recharge_amount_recieved': cash_sale_recharge_amount_recieved,
-        'cash_sale_recharge_count':cash_sale_recharge_count,
         
         'cash_total_vat':cash_total_vat,
         'cash_total_qty': cash_total_qty,
@@ -5490,10 +5239,22 @@ def dsr_summary1(request):
     
     return render(request, 'sales_management/dsr_summary1.html', context)
 
+
+def get_salesmen_by_route(request):
+    route_name = request.GET.get('route_name')
+    if route_name:
+        van_routes = Van_Routes.objects.filter(routes__route_name=route_name)
+        salesmen = [
+            {"id": route.van.salesman.pk, "name": route.van.salesman.username}
+            for route in van_routes if route.van and route.van.salesman
+        ]
+        return JsonResponse({"salesmen": salesmen})
+    return JsonResponse({"salesmen": []})
+
+
 def print_dsr_summary(request):
     
     filter_data = {}
-    stock_summary = {}
     data_filter = False
     total_count = 0
     non_visited_count = 0
@@ -5506,11 +5267,6 @@ def print_dsr_summary(request):
     total_supplied_bottles = 0
     emergency_supply_count = 0
     visited_customers_count = 0
-    new_customers_count = 0
-    planned_visit_count = 0
-    visited_customers_count = 0
-    non_visited_count = 0
-    unplanned_count = 0
     cash_total_net_taxable = 0
     cash_total_vat = 0
     cash_total_subtotal = 0
@@ -5530,9 +5286,9 @@ def print_dsr_summary(request):
     today_payable = 0
     suspense_paid_amount = 0
     suspense_balance_amount = 0
-    outstanding_credit_notes_total_amount = 0
-    outstanding_credit_notes_received_amount = 0
-    outstanding_credit_notes_balance = 0
+    todays_opening_outstanding_amount = 0
+    credit_outstanding_collected_amount = 0
+    outstanding_closing_balance = 0
     outstanding_total_amount_collected = 0
     cash_sales_amount_collected = 0
     credit_sales_amount_collected = 0
@@ -5586,31 +5342,14 @@ def print_dsr_summary(request):
     credit_sale_recharge_amount_recieved = 0
     foc_total_quantity = 0
     
-    extra_bottles = []
-    total_extra_bottle_qty = 0
-    total_extra_bottle_collection = 0
-    total_sum_extra_bottle = 0
-    
-    missed_bottles = []
-    total_missed_bottle_qty = 0
-    total_missed_bottle_collection = 0
-    total_sum_missed_bottle = 0
-    
-    customer_custody_instances = fgallon_credit_custody_instances = fgallon_coupon_custody_instances = nonfgallon_credit_custody_instances = nonfgallon_coupon_custody_instances = CustodyCustom.objects.none
+    customer_custody_instances = CustodyCustom.objects.none
+    collected_amount_from_custody_issue = 0
+    customer_custody_items_fgallon_instances = CustodyCustomItems.objects.none
+    customer_custody_items_fgallon_count = 0
     customer_custody_items_nonfgallon_instances = CustodyCustomItems.objects.none
-    fgallon_custody_instances = nonfgallon_custody_instances = fgallon_cash_custody_instances = nonfgallon_cash_custody_instances = CustodyCustomItems.objects.none
-
-    fgallon_cash_custody_total_quantity = fgallon_cash_custody_total_quantity = total_amount_from_custody_issue = nonfgallon_cash_custody_total_quantity = nonfgallon_credit_custody_total_quantity = fgallon_coupon_custody_total_quantity = fgallon_credit_custody_total_quantity = collected_amount_from_custody_issue = 0
-    nonfgallon_coupon_custody_total_quantity = 0
-    
-    outstanding_amounts = []
-    outstanding_coupons = []
-    outstanding_cans = []
-    
-    cash_custody_items_fgallon_quantity = total_quantity_from_custody_issue = 0
+    customer_custody_items_nonfgallon_count = 0
    
     salesman_id =  ""
-    old_bottles_collected = {}
     van_instances = Van.objects.none
     van_route = Van_Routes.objects.none
     products = ProdutItemMaster.objects.none
@@ -5620,7 +5359,6 @@ def print_dsr_summary(request):
     coupon_sales = CustomerSupply.objects.none
     foc_customers = CustomerSupply.objects.none
     routes_instances = RouteMaster.objects.all()
-    coupon_items = ProdutItemMaster.objects.none
     customer_coupons = CustomerCoupon.objects.none
     other_cash_sales = CustomerSupply.objects.none
     other_credit_sales = CustomerSupply.objects.none
@@ -5633,10 +5371,6 @@ def print_dsr_summary(request):
     five_gallon_credit_sales = CustomerSupply.objects.none
     dialy_collections = InvoiceDailyCollection.objects.none
     pending_bottle_customer_instances = CustomerSupply.objects.none
-    
-    customer_return = CustomerReturnItems.objects.none
-    customer_return_qty = 0
-    customer_return_amount = 0
     
     date = request.GET.get('date')
     route_name = request.GET.get('route_name')
@@ -5656,154 +5390,54 @@ def print_dsr_summary(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman,is_deleted=False).count()
+        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
-        emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman,customer__is_deleted=False).count()
-        #actual visit
-        # --- Get visited customers ---
-        visited_customers = (
-            CustomerSupply.objects.filter(
-                salesman_id=salesman,
-                created_date__date=date,
-                customer__is_deleted=False,
-            )
-            .values_list("customer_id", flat=True)
-            .distinct()
-        )
-        visited_customers_count = visited_customers.count()
-
-        # --- Visited customers ---
-        visited_customers = (
-            CustomerSupply.objects.filter(
-                salesman_id=salesman,
-                created_date__date=date,
-                customer__is_deleted=False,
-            )
-            .values_list("customer_id", flat=True)
-            .distinct()
-        )
-        visited_customer_ids = set(visited_customers)
-
-        # --- Planned customers ---
-        todays_customers = find_customers(request, str(date), van_route.routes.pk)
-
-        # Handle different data formats
-        if hasattr(todays_customers, "values_list"):
-            planned_customer_ids = set(todays_customers.values_list("id", flat=True))
-        elif isinstance(todays_customers, list):
-            # extract IDs if it's list of dicts
-            planned_customer_ids = {c.get("id") for c in todays_customers if isinstance(c, dict)}
-        else:
-            planned_customer_ids = set()
-
-        planned_visit_count = len(planned_customer_ids)
-
-        # --- Non-visited (planned but not visited) ---
-        non_visited_count = len(planned_customer_ids - visited_customer_ids)
-
-        # --- Unplanned (visited but not planned) ---
-        unplanned_count = len(visited_customer_ids - planned_customer_ids)
-
-        # --- New customers created today ---
-        new_customers_count = Customers.objects.filter(
-            created_date__date=date,
-            is_deleted=False,
-            
-        ).count()
-
-        # --- Emergency supply ---
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
+        #actual visit
+        visited_customers_count = CustomerSupply.objects.filter(salesman_id=salesman, created_date__date=date).distinct().count()
+        todays_customers = find_customers(request, str(date), van_route.routes.pk)
+        if todays_customers :
+            planned_visit_count = len(todays_customers)
+        else:
+            planned_visit_count = 0
+        non_visited_count = planned_visit_count - visited_customers_count
         
         ##### stock report #### 
         products = ProdutItemMaster.objects.filter()
         van_instances = Van.objects.get(salesman=salesman)
-        van_product_stock = VanProductStock.objects.filter(created_date=date,van=van_instances)
+        van_product_stock = VanProductStock.objects.filter(created_date=date,van=van_instances,product__product_name="5 Gallon")
         stock_report_total = van_product_stock.aggregate(total_stock=Sum('stock'))['total_stock'] or 0
         # vanstock_curreptions(van_instances.pk,date)
         
-        van_coupons_type_names = VanCouponStock.objects.filter(closing_count__gt=0, van=van_instances).values_list("coupon__coupon_type__coupon_type_name")
-        coupon_items = products.filter(product_name__in=van_coupons_type_names,category__category_name="Coupons")
-        
         #### Bottle Count ####
-        total_empty_bottles = van_product_stock.filter(product__product_name="5 Gallon").aggregate(totalempty_bottle=Sum('empty_can_count'))['totalempty_bottle'] or 0
-        total_supplied_bottles =  van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_sold=Sum('sold_count'))['total_sold'] or 0
-        pending_bottle_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_pending=Sum('pending_count'))['total_pending'] or 0
-        damage_bottle_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_damage=Sum('damage_count'))['total_damage'] or 0
-        closing_stock_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_closing=Sum('closing_count'))['total_closing'] or 0
-        total_count = van_product_stock.filter(product__product_name="5 Gallon").aggregate(total_stock=Sum('stock'))['total_stock'] or 0
-        
-        # *************************************** #
-        # *************************************** #
-        # Custody Issue 
-        customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date, customer__routes=van_route.routes, customer__is_deleted=False,  sales_type__isnull=False)
-        total_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        collected_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('amount_collected'))['total_amount'] or 0
-        # 5 gallon custody instances
-        fgallon_custody_instances = customer_custody_instances.filter(custodycustomitems__product__product_name="5 Gallon")
-        
-        fgallon_cash_custody_instances = fgallon_custody_instances.filter(sales_type="CASH")
-        fgallon_cash_custody_total_quantity = fgallon_cash_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_cash_custody_total_total_amount = fgallon_cash_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        fgallon_cash_custody_total_total_collected = fgallon_cash_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        fgallon_credit_custody_instances = fgallon_custody_instances.filter(sales_type="CREDIT")
-        fgallon_credit_custody_total_quantity = fgallon_credit_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_credit_custody_total_total_amount = fgallon_credit_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        fgallon_credit_custody_total_total_collected = fgallon_credit_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        fgallon_coupon_custody_instances = fgallon_custody_instances.filter(sales_type="COUPON")
-        fgallon_coupon_custody_total_quantity = fgallon_coupon_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        fgallon_coupon_custody_total_total_collected = fgallon_coupon_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        # non 5 gallon custody instances
-        nonfgallon_custody_instances = customer_custody_instances.exclude(custodycustomitems__product__product_name="5 Gallon")
-        
-        nonfgallon_cash_custody_instances = nonfgallon_custody_instances.filter(sales_type="CASH")
-        nonfgallon_cash_custody_total_quantity = nonfgallon_cash_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_cash_custody_total_total_amount = nonfgallon_cash_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_cash_custody_total_total_collected = nonfgallon_cash_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        nonfgallon_credit_custody_instances = nonfgallon_custody_instances.filter(sales_type="CREDIT")
-        nonfgallon_credit_custody_total_quantity = nonfgallon_credit_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_credit_custody_total_total_amount = nonfgallon_credit_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_credit_custody_total_total_collected = nonfgallon_credit_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        nonfgallon_coupon_custody_instances = nonfgallon_custody_instances.filter(sales_type="COUPON")
-        nonfgallon_coupon_custody_total_quantity = nonfgallon_coupon_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-        nonfgallon_coupon_custody_total_total_amount = nonfgallon_coupon_custody_instances.aggregate(total_amount=Sum('total_amount'))['total_amount'] or 0
-        nonfgallon_coupon_custody_total_total_collected = nonfgallon_coupon_custody_instances.aggregate(total_collected=Sum('amount_collected'))['total_collected'] or 0
-        
-        # *************************************** #
-        # *************************************** #
+        total_empty_bottles = van_product_stock.aggregate(totalempty_bottle=Sum('empty_can_count'))['totalempty_bottle'] or 0
+        total_supplied_bottles =  van_product_stock.aggregate(total_sold=Sum('sold_count'))['total_sold'] or 0
+        pending_bottle_count = van_product_stock.aggregate(total_pending=Sum('pending_count'))['total_pending'] or 0
+        damage_bottle_count = van_product_stock.aggregate(total_damage=Sum('damage_count'))['total_damage'] or 0
+        closing_stock_count = van_product_stock.aggregate(total_closing=Sum('closing_count'))['total_closing'] or 0
+        total_count = van_product_stock.aggregate(total_stock=Sum('stock'))['total_stock'] or 0
         
         #### coupon sales count ####
-        customer_coupons=CustomerCoupon.objects.filter(salesman=salesman,created_date__date=date,customer__is_deleted=False)
+        customer_coupons=CustomerCoupon.objects.filter(salesman=salesman,created_date__date=date)
         
-        five_gallon_supply = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon",customer_supply__customer__is_deleted=False,).values_list('customer_supply__pk', flat=True)
-        other_supply = CustomerSupplyItems.objects.filter(customer_supply__customer__is_deleted=False,).exclude(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
+        five_gallon_supply = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
+        other_supply = CustomerSupplyItems.objects.exclude(customer_supply__created_date__date=date,customer_supply__salesman=salesman,product__product_name="5 Gallon").values_list('customer_supply__pk', flat=True)
         ### Cash Sales Start ###
-        five_gallon_cash_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False).exclude(customer__sales_type="CASH COUPON")
-        other_cash_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False).exclude(customer__sales_type="CASH COUPON")
+        five_gallon_cash_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
+        other_cash_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__gt=0).exclude(customer__sales_type="CASH COUPON")
         # Aggregating for five_gallon_cash_sales
         five_gallon_cash_total_net_taxable = five_gallon_cash_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        five_gallon_cash_total_net_taxable = five_gallon_cash_total_net_taxable + fgallon_cash_custody_total_total_amount 
         five_gallon_cash_total_vat = five_gallon_cash_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
-        five_gallon_cash_total_subtotal = fgallon_cash_custody_total_total_amount + five_gallon_cash_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
+        five_gallon_cash_total_subtotal = five_gallon_cash_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
         five_gallon_cash_total_received = five_gallon_cash_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        five_gallon_cash_total_received = five_gallon_cash_total_received + fgallon_cash_custody_total_total_collected
         five_gallon_cash_total_quantity = five_gallon_cash_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        five_gallon_cash_total_quantity = five_gallon_cash_total_quantity + fgallon_cash_custody_total_quantity
 
         # Aggregating for other_cash_sales (corrected to use other_cash_sales)
         other_cash_total_net_taxable = other_cash_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        other_cash_total_net_taxable = other_cash_total_net_taxable + nonfgallon_cash_custody_total_total_amount
         other_cash_total_vat = other_cash_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         other_cash_total_subtotal = other_cash_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        other_cash_total_subtotal = other_cash_total_subtotal + nonfgallon_cash_custody_total_total_amount
         other_cash_total_received = other_cash_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        other_cash_total_received = other_cash_total_received + nonfgallon_cash_custody_total_total_collected
         other_cash_total_quantity = other_cash_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        other_cash_total_quantity = other_cash_total_quantity + nonfgallon_cash_custody_total_quantity
 
         # Combining both cash sales querysets
         cash_sales = five_gallon_cash_sales.union(other_cash_sales)
@@ -5813,7 +5447,7 @@ def print_dsr_summary(request):
         cash_total_received = five_gallon_cash_total_received + other_cash_total_received
         cash_total_quantity = five_gallon_cash_total_quantity + other_cash_total_quantity
         
-        recharge_cash_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__gt=0,customer__is_deleted=False)
+        recharge_cash_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__gt=0)
         cash_sale_recharge_net_payeble = recharge_cash_sales.aggregate(total_net_amount=Sum('net_amount'))['total_net_amount'] or 0
         cash_sale_recharge_vat_total = 0
         cash_sale_recharge_grand_total = recharge_cash_sales.aggregate(total_grand_total=Sum('grand_total'))['total_grand_total'] or 0
@@ -5831,30 +5465,22 @@ def print_dsr_summary(request):
         ### Cash Sales End ###
         
         ### credit sales Start ####
-        five_gallon_credit_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
-        other_credit_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+        five_gallon_credit_sales = CustomerSupply.objects.filter(pk__in=five_gallon_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
+        other_credit_sales = CustomerSupply.objects.filter(pk__in=other_supply,created_date__date=date,salesman=salesman,amount_recieved__lte=0).exclude(customer__sales_type__in=["FOC","CASH COUPON"])
         
         # Aggregating for five_gallon_credit_sales
         five_gallon_credit_total_net_taxable = five_gallon_credit_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        five_gallon_credit_total_net_taxable = five_gallon_credit_total_net_taxable + fgallon_credit_custody_total_total_amount
         five_gallon_credit_total_vat = five_gallon_credit_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         five_gallon_credit_total_subtotal = five_gallon_credit_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        five_gallon_credit_total_subtotal = five_gallon_credit_total_subtotal + fgallon_credit_custody_total_total_amount
         five_gallon_credit_total_received = five_gallon_credit_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        five_gallon_credit_total_received = five_gallon_credit_total_received + fgallon_credit_custody_total_total_collected
         five_gallon_credit_total_quantity = five_gallon_credit_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        five_gallon_credit_total_quantity = five_gallon_credit_total_quantity + fgallon_credit_custody_total_quantity
 
         # Aggregating for other_credit_sales (corrected to use other_credit_sales)
         other_credit_total_net_taxable = other_credit_sales.aggregate(total_net_taxable=Sum('net_payable'))['total_net_taxable'] or 0
-        other_credit_total_net_taxable = other_credit_total_net_taxable + nonfgallon_credit_custody_total_total_amount
         other_credit_total_vat = other_credit_sales.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
         other_credit_total_subtotal = other_credit_sales.aggregate(total_subtotal=Sum('subtotal'))['total_subtotal'] or 0
-        other_credit_total_subtotal = other_credit_total_subtotal + nonfgallon_credit_custody_total_total_amount
         other_credit_total_received = other_credit_sales.aggregate(total_amount_recieved=Sum('amount_recieved'))['total_amount_recieved'] or 0
-        other_credit_total_received = other_credit_total_received + nonfgallon_credit_custody_total_total_collected
         other_credit_total_quantity = other_credit_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        other_credit_total_quantity = other_credit_total_quantity + nonfgallon_credit_custody_total_quantity
         
         # Combining both cash sales querysets
         credit_sales = five_gallon_credit_sales.union(other_credit_sales)
@@ -5864,7 +5490,7 @@ def print_dsr_summary(request):
         credit_total_received = five_gallon_credit_total_received + other_credit_total_received
         credit_total_quantity = five_gallon_credit_total_quantity + other_credit_total_quantity
         
-        recharge_credit_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__lte=0,customer__is_deleted=False)
+        recharge_credit_sales = CustomerCoupon.objects.filter(created_date__date=date,salesman=salesman,amount_recieved__lte=0)
         credit_sale_recharge_net_payeble = recharge_credit_sales.aggregate(total_net_amount=Sum('net_amount'))['total_net_amount'] or 0
         credit_sale_recharge_vat_total = 0
         credit_sale_recharge_grand_total = recharge_credit_sales.aggregate(total_grand_total=Sum('grand_total'))['total_grand_total'] or 0
@@ -5881,52 +5507,17 @@ def print_dsr_summary(request):
         ### credit sales End ####
         
         # Coupon sales
-        coupon_sales = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,customer__sales_type="CASH COUPON",customer__is_deleted=False)
+        coupon_sales = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,customer__sales_type="CASH COUPON")
         for sale in coupon_sales:
             sale.outstanding_manual_coupons = sale.outstanding_manual_coupons()
             sale.outstanding_digital_coupons = sale.outstanding_digital_coupons()
-        manual_coupon_total = (
-            CustomerSupplyCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_leaf=Count('leaf'))['total_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustomerSupplyCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_free_leaf=Count('free_leaf'))['total_free_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustodyCustomCoupon.objects.filter(
-                custody__in=fgallon_coupon_custody_instances
-            ).aggregate(total_leaf=Count('leaf'))['total_leaf'] or 0
-        )
-
-        manual_coupon_total += (
-            CustodyCustomCoupon.objects.filter(
-                custody__in=fgallon_coupon_custody_instances
-            ).aggregate(total_free_leaf=Count('free_leaf'))['total_free_leaf'] or 0
-        )
-
-        digital_coupon_total = (
-            CustomerSupplyDigitalCoupon.objects.filter(
-                customer_supply__in=coupon_sales,
-                customer_supply__customer__is_deleted=False,
-                
-            ).aggregate(total_count=Sum('count'))['total_count'] or 0
-        )
-
+        manual_coupon_total = CustomerSupplyCoupon.objects.filter(customer_supply__in=coupon_sales).aggregate(Count('leaf'))['leaf__count']
+        digital_coupon_total = CustomerSupplyDigitalCoupon.objects.filter(customer_supply__in=coupon_sales).aggregate(total_count=Sum('count'))['total_count'] or 0
         
         total_coupon_sales_count = coupon_sales.count()
         
         total_sales_count = total_cash_sales_count + total_credit_sales_count + total_coupon_sales_count
         coupon_total_qty = coupon_sales.aggregate(total_quantity=Sum('customersupplyitems__quantity'))['total_quantity'] or 0
-        coupon_total_qty = coupon_total_qty + fgallon_coupon_custody_total_quantity + nonfgallon_coupon_custody_total_quantity 
         
         # Calculate total outstanding digital and manual coupons
         total_outstandaing_manual_coupons = sum(sale.outstanding_manual_coupons for sale in coupon_sales)
@@ -5947,34 +5538,58 @@ def print_dsr_summary(request):
         suspense_balance_amount = today_payable - suspense_paid_amount
         
         # collection details
-        dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,customer__is_deleted=False)
+        dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
-        outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes,customer_outstanding__customer__is_deleted=False).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-        dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-        outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
-        outstanding_credit_notes_received_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-        outstanding_credit_notes_balance = outstanding_credit_notes_total_amount - outstanding_credit_notes_received_amount
-        outstanding_total_amount_collected = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # todays_opening_outstanding_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        # dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        
+        # todays_opening_outstanding_amount = todays_opening_outstanding_amount - dialy_colection_upto__yesterday - credit_total_subtotal
+        # credit_outstanding_collected_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        # outstanding_closing_balance = todays_opening_outstanding_amount + credit_total_subtotal - credit_outstanding_collected_amount
+        # outstanding_total_amount_collected = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        
+        outstanding_amount_upto_yesterday = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lt=date,customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        dialy_colection_upto_yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        todays_opening_outstanding_amount = outstanding_amount_upto_yesterday - dialy_colection_upto_yesterday
+        credit_outstanding_collected_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
+        outstanding_closing_balance = todays_opening_outstanding_amount + credit_total_subtotal - credit_outstanding_collected_amount
         
         # pending customers
-        pending_bottle_customer_instances = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,allocate_bottle_to_pending__gt=0,customer__is_deleted=False)
+        pending_bottle_customer_instances = CustomerSupply.objects.filter(created_date__date=date,salesman=salesman,allocate_bottle_to_pending__gt=0)
         # 5 gallon rate based
         customer_supplies = CustomerSupply.objects.filter(created_date__date=date,salesman_id=salesman_id)
         invoice_nos = customer_supplies.values_list('invoice_no', flat=True)
         invoice_items = InvoiceItems.objects.filter(invoice__invoice_no__in=invoice_nos)
+
         rate_expr = ExpressionWrapper(
             F('rate') / F('qty'),
             output_field=DecimalField(max_digits=10, decimal_places=2)
         )
+
+        # Annotate with calculated_rate
         invoice_items = invoice_items.annotate(calculated_rate=Round(rate_expr, 2))
+
+        # ✅ Exclude zero or null values
+        invoice_items = invoice_items.exclude(calculated_rate__isnull=True).exclude(calculated_rate=0)
+
+        # Get unique non-zero rates
         unique_amounts = set(invoice_items.values_list('calculated_rate', flat=True))
         # unique_amounts = set(CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon").values_list('customer_supply__customer__rate', flat=True))
-        five_gallon_rate_wise_instances = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon",customer_supply__customer__is_deleted=False,)
+        five_gallon_rate_wise_instances = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,product__product_name="5 Gallon")
         total_debit_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__amount_recieved__gt=0).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
         total_credit_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__amount_recieved=0).exclude(customer_supply__customer__sales_type__in=["FOC","CASH COUPON"]).aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
         total_coupon_amount_count = five_gallon_rate_wise_instances.filter(customer_supply__customer__sales_type="CASH COUPON").aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
+        
+        # Custody Issue 
+        customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date,customer__routes=van_route.routes)
+        collected_amount_from_custody_issue = customer_custody_instances.aggregate(total_amount=Sum('amount_collected'))['total_amount'] or 0
+        
+        customer_custody_items_fgallon_instances = CustodyCustomItems.objects.filter(custody_custom__pk__in=customer_custody_instances.values_list('pk'),product__product_name="5 Gallon")
+        customer_custody_items_fgallon_count = customer_custody_items_fgallon_instances.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+        # custody other products
+        customer_custody_items_nonfgallon_instances = CustodyCustomItems.objects.filter(custody_custom__pk__in=customer_custody_instances.values_list('pk')).exclude(product__product_name="5 Gallon")
+        customer_custody_items_nonfgallon_count = customer_custody_items_nonfgallon_instances.aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
         
         # cash sales amount collected
         supply_amount_collected = cash_total_amount_recieved
@@ -5984,16 +5599,16 @@ def print_dsr_summary(request):
         credit_sales_amount_collected = dialy_collections.aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         total_sales_amount_collected = cash_sales_amount_collected + credit_sales_amount_collected
         
-        cheque_collection = CollectionPayment.objects.filter(payment_method="CHEQUE",created_date__date=date,salesman=salesman,customer__is_deleted = False, )
+        cheque_collection = CollectionPayment.objects.filter(payment_method="CHEQUE",created_date__date=date,salesman=salesman)
         no_of_collected_cheque = cheque_collection.count()
         collected_cheque_amount = cheque_collection.aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         
-        balance_in_hand = total_sales_amount_collected  - collected_cheque_amount - today_expense
-        net_payble = total_sales_amount_collected - today_expense
+        balance_in_hand = total_sales_amount_collected + collected_amount_from_custody_issue - collected_cheque_amount - today_expense
+        net_payble = total_sales_amount_collected + collected_amount_from_custody_issue - today_expense
         
         foc_customers = (
-            CustomerSupply.objects.filter(created_date__date=date, customer__sales_type='FOC', salesman=salesman,customer__is_deleted = False, ) |
-            CustomerSupply.objects.filter(created_date__date=date, salesman=salesman, allocate_bottle_to_free__gt=0,customer__is_deleted = False, )
+            CustomerSupply.objects.filter(created_date__date=date, customer__sales_type='FOC', salesman=salesman) |
+            CustomerSupply.objects.filter(created_date__date=date, salesman=salesman, allocate_bottle_to_free__gt=0)
         )
         for foc in foc_customers:
             if foc.allocate_bottle_to_free != 0:
@@ -6002,85 +5617,20 @@ def print_dsr_summary(request):
                 foc_total_quantity =foc_total_quantity + foc.get_total_supply_qty()
                 
         damage_bottle_instances = VanSaleDamage.objects.filter(van=van_instances,created_date__date=date)
-        #outstanding
-        today = timezone.now().date()
-        amount_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='amount', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in amount_entries:
-            if o.customer:
-                outstanding_amounts.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-
-        coupon_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='coupons', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in coupon_entries:
-            if o.customer:
-                outstanding_coupons.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-
-        can_entries = CustomerOutstanding.objects.filter(customer__routes__route_name=route_name,
-            product_type='emptycan', created_date__date=today,
-            customer__is_deleted = False, 
-        ).select_related('customer')
-
-        for o in can_entries:
-            if o.customer:
-                outstanding_cans.append({
-                    'code': o.customer.custom_id,
-                    'name': o.customer.customer_name,
-                    'value': o.get_outstanding_count()
-                })
-                
-        customer_supply_item_details = CustomerSupplyItems.objects.filter(customer_supply__created_date__date=date,customer_supply__salesman_id=salesman,customer_supply__customer__is_deleted=False,)
-
-        for cs_item in customer_supply_item_details:
-            item_quantity = cs_item.quantity or 0
-            item_foc_qty = cs_item.customer_supply.allocate_bottle_to_free or 0
-            item_collected_qty = cs_item.customer_supply.collected_empty_bottle or 0
-
-            expected_total = item_quantity + item_foc_qty
-            excess_bottle = item_collected_qty - expected_total
-
-            if excess_bottle > 0:
-                extra_bottles.append(cs_item)
-                total_sum_extra_bottle += excess_bottle
-            elif excess_bottle < 0:
-                missed_bottles.append(cs_item)
-                total_sum_missed_bottle += abs(excess_bottle)
-                
-        customer_return = CustomerReturnItems.objects.filter(customer_return__created_date__date=date,customer_return__customer__routes__route_name=route_name)
-        customer_return_qty = customer_return.aggregate(total_count=Sum('quantity'))['total_count'] or 0
-        customer_return_amount = customer_return.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         
-        total_quantity_from_custody_issue = customer_custody_instances.aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0
-
     context = {
         'van_route': van_route,
         'data_filter': data_filter,
         'salesman_id': salesman_id,
         # visit statistics
         'routes_instances': routes_instances,
-        "new_customers_count": new_customers_count,
-        "planned_visit_count": planned_visit_count,
-        "visited_customers_count": len(visited_customer_ids),
-        "non_visited_count": non_visited_count,
-        "unplanned_count": unplanned_count,
-        "emergency_supply_count": emergency_supply_count,
+        'non_visited_count': non_visited_count,
+        'planned_visit_count': planned_visit_count,
+        'new_customers_count': new_customers_count,
+        'emergency_supply_count': emergency_supply_count,
+        'visited_customers_count': visited_customers_count,
         # stock report
         'products': products,
-        'coupon_items': coupon_items,
         'van_instances': van_instances,
         'van_product_stock': van_product_stock,
         'stock_report_total': stock_report_total,
@@ -6100,7 +5650,7 @@ def print_dsr_summary(request):
         'five_gallon_cash_total_vat': five_gallon_cash_total_vat,
         'five_gallon_cash_total_subtotal': five_gallon_cash_total_subtotal,
         'five_gallon_cash_total_received': five_gallon_cash_total_received,
-        'five_gallon_cash_total_quantity': five_gallon_cash_total_quantity + cash_custody_items_fgallon_quantity,
+        'five_gallon_cash_total_quantity': five_gallon_cash_total_quantity,
         'five_gallon_cash_total_net_taxable': five_gallon_cash_total_net_taxable,
         # other cash sales
         'other_cash_sales': other_cash_sales,
@@ -6115,7 +5665,6 @@ def print_dsr_summary(request):
         'cash_sale_recharge_grand_total': cash_sale_recharge_grand_total,
         'cash_sale_recharge_net_payeble': cash_sale_recharge_net_payeble,
         'cash_sale_recharge_amount_recieved': cash_sale_recharge_amount_recieved,
-        'cash_sale_recharge_count':cash_sale_recharge_count,
         
         'cash_total_vat':cash_total_vat,
         'cash_total_qty': cash_total_qty,
@@ -6159,10 +5708,10 @@ def print_dsr_summary(request):
         'in_hand_amount': in_hand_amount,
         'suspense_paid_amount': suspense_paid_amount,
         'suspense_balance_amount': suspense_balance_amount,
-        'outstanding_credit_notes_balance': outstanding_credit_notes_balance,
+        'outstanding_closing_balance': outstanding_closing_balance,
         'outstanding_total_amount_collected':outstanding_total_amount_collected,
-        'outstanding_credit_notes_total_amount' : outstanding_credit_notes_total_amount,
-        'outstanding_credit_notes_received_amount' : outstanding_credit_notes_received_amount,
+        'todays_opening_outstanding_amount' : todays_opening_outstanding_amount,
+        'credit_outstanding_collected_amount' : credit_outstanding_collected_amount,
         # 5 gallon rate based
         'five_gallon_rates': unique_amounts,
         'total_debit_amount_count': total_debit_amount_count,
@@ -6179,64 +5728,24 @@ def print_dsr_summary(request):
         'cash_sales_amount_collected': cash_sales_amount_collected,
         'total_sales_amount_collected': total_sales_amount_collected,
         'credit_sales_amount_collected': credit_sales_amount_collected,
-         # custody details
+        # custody details
         'customer_custody_instances': customer_custody_instances,
-        'total_amount_from_custody_issue': total_amount_from_custody_issue,
         'collected_amount_from_custody_issue': collected_amount_from_custody_issue,
-        # custody intances
-        'fgallon_custody_instances': fgallon_custody_instances,
-        
-        'fgallon_cash_custody_instances': fgallon_cash_custody_instances,
-        'fgallon_cash_custody_total_quantity': fgallon_cash_custody_total_quantity,
-        
-        'fgallon_credit_custody_instances': fgallon_credit_custody_instances,
-        'fgallon_credit_custody_total_quantity': fgallon_credit_custody_total_quantity,
-        
-        'fgallon_coupon_custody_instances': fgallon_coupon_custody_instances,
-        'fgallon_coupon_custody_total_quantity': fgallon_coupon_custody_total_quantity,
-        
-        'nonfgallon_custody_instances': nonfgallon_custody_instances,
-        
-        'nonfgallon_cash_custody_instances': nonfgallon_cash_custody_instances,
-        'nonfgallon_cash_custody_total_quantity': nonfgallon_cash_custody_total_quantity,
-        
-        'nonfgallon_credit_custody_instances': nonfgallon_credit_custody_instances,
-        'nonfgallon_credit_custody_total_quantity': nonfgallon_credit_custody_total_quantity,
-        
-        'nonfgallon_coupon_custody_instances': nonfgallon_coupon_custody_instances,
-        'nonfgallon_coupon_custody_total_quantity': nonfgallon_coupon_custody_total_quantity,
-        
+        'customer_custody_items_fgallon_instances': customer_custody_items_fgallon_instances,
+        'customer_custody_items_fgallon_count': customer_custody_items_fgallon_count,
         'customer_custody_items_nonfgallon_instances': customer_custody_items_nonfgallon_instances,
-        'total_quantity_from_custody_issue': total_quantity_from_custody_issue,
+        'customer_custody_items_nonfgallon_count': customer_custody_items_nonfgallon_count,
         
-        # custody return
-        'customer_return': customer_return,
-        'customer_return_qty': customer_return_qty,
-        'customer_return_amount': customer_return_amount,
         'damage_bottle_instances': damage_bottle_instances,
-        
-        'extra_bottles': extra_bottles,
-        'total_extra_bottle_qty': total_extra_bottle_qty,
-        'total_extra_bottle_collection': total_extra_bottle_collection,
-        'total_sum_extra_bottle': total_sum_extra_bottle,
-        
-        'missed_bottles': missed_bottles,
-        'total_missed_bottle_qty': total_missed_bottle_qty,
-        'total_missed_bottle_collection': total_missed_bottle_collection,
-        'total_sum_missed_bottle': total_sum_missed_bottle,
         
         'net_payble': net_payble,
         'balance_in_hand': balance_in_hand,
         
+        'foc_total_quantity':foc_total_quantity,
+        
         'filter_data': filter_data,
         # FOC customer
         'foc_customers':foc_customers,
-        'foc_total_quantity':foc_total_quantity,
-        
-        'outstanding_amounts': outstanding_amounts,
-        'outstanding_coupons': outstanding_coupons,
-        'outstanding_cans': outstanding_cans,
-        # FOC customer
         'filter_date_formatted': date.strftime('%d-%m-%Y'),
     }
     
@@ -6303,7 +5812,7 @@ def print_dsr_summary(request):
 #         salesman = van_route.van.salesman
 #         filter_data['route_name'] = route_name
 #         #new customers created
-#         new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman).count()
+#         new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
 #         #emergency supply
 #         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
 #         #actual visit
@@ -6348,7 +5857,7 @@ def print_dsr_summary(request):
 #         cash_total_amout_total = cash_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
         
 #         ### credit sales ####
-#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoive")
+#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoice")
 #         credit_total_net_taxable = credit_invoices.aggregate(total_net_taxable=Sum('net_taxable'))['total_net_taxable'] or 0
 #         credit_total_vat = credit_invoices.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
 #         credit_total_amout_total = credit_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
@@ -6493,7 +6002,7 @@ def print_dsr_summary(request):
 #         salesman = van_route.van.salesman
 #         filter_data['route_name'] = route_name
 #         #new customers created
-#         new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman).count()
+#         new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
 #         #emergency supply
 #         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
 #         #actual visit
@@ -6538,7 +6047,7 @@ def print_dsr_summary(request):
 #         cash_total_amout_total = cash_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
         
 #         ### credit sales ####
-#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoive")
+#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoice")
 #         credit_total_net_taxable = credit_invoices.aggregate(total_net_taxable=Sum('net_taxable'))['total_net_taxable'] or 0
 #         credit_total_vat = credit_invoices.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
 #         credit_total_amout_total = credit_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
@@ -6800,7 +6309,6 @@ def outstanding_amount_collected(request):
         outstanding_total_amount_collected = dialy_collections.filter(
             created_date__date=date
         ).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
-
     else:
         dialy_collections = []
 
@@ -6946,7 +6454,7 @@ def dsr(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -7088,7 +6596,7 @@ def dsr(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
@@ -7384,7 +6892,7 @@ def print_dsr(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -7527,7 +7035,7 @@ def print_dsr(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
@@ -7714,7 +7222,9 @@ def collection_list_view(request):
     
     today = datetime.datetime.today().date()
     if start_date and end_date:
-        instances = instances.filter(created_date__range=[start_date, end_date])
+        start = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+        instances = instances.filter(created_date__gte=start, created_date__lt=end)
         filter_data['start_date'] = start_date
         filter_data['end_date'] = end_date
     
@@ -7805,19 +7315,21 @@ def coupon_sales_report_view(request):
         customer_coupon__created_date__date__range=[start_datetime, end_datetime]
     )
     
-    # print("After date filter:", coupon_sales)
+    print("After date filter:", coupon_sales)
     if sales_type :
         coupon_sales = coupon_sales.filter(customer_coupon__customer__sales_type=sales_type)
-    # print("After sales_type filter:", coupon_sales)
+    print("After sales_type filter:", coupon_sales)
     if route_name:
         coupon_sales = coupon_sales.filter(customer_coupon__customer__routes__route_name=route_name)
-    # print("After route_name filter:", coupon_sales)
+    print("After route_name filter:", coupon_sales)
 
     # Calculate total sums
     total_rate = coupon_sales.aggregate(total=Sum('rate'))['total'] or 0
     total_amount_collected = coupon_sales.aggregate(total=Sum('customer_coupon__amount_recieved'))['total'] or 0
     total_balance = coupon_sales.aggregate(total=Sum('customer_coupon__balance'))['total'] or 0
-    total_per_leaf_rate = sum(round(coupon.get_avg_rate(), 2) for coupon in coupon_sales if coupon.get_avg_rate() is not None)
+    total_per_leaf_rate = sum(coupon.get_per_leaf_rate() for coupon in coupon_sales if coupon.get_per_leaf_rate() is not None)
+
+
 
     # Fetch routes for dropdown
     routes_instances = RouteMaster.objects.all()
@@ -7840,7 +7352,7 @@ def coupon_sales_report_view(request):
         'routes_instances': routes_instances,
         'data_filter': any([start_date, end_date, sales_type, route_name])  # To show reset filter button
     }
-    # print("context",context)
+    print("context",context)
 
     return render(request, 'sales_management/coupon_sales_report.html', context)
 
@@ -7919,7 +7431,7 @@ def coupon_sales_excel_view(request):
         df.to_excel(writer, sheet_name='Coupon Sales', index=False)
 
     # Prepare HTTP response with Excel file
-    filename = f"Coupon_Sales_Report_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
+    filename = f"Coupon_Sales_Report_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx"
     response = HttpResponse(buffer.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     
@@ -8359,8 +7871,8 @@ def delete_receipt(request, receipt_number, customer_id):
 #     return render(request, 'sales_management/monthly_sales_report.html', context)
 
 def monthly_sales_report(request):
-    month = int(request.GET.get('month', datetime.now().month))
-    year = datetime.now().year  
+    month = int(request.GET.get('month', datetime.datetime.now().month))
+    year = datetime.datetime.now().year  
     monthly_sales = (
         CustomerSupply.objects
         .filter(created_date__year=year, created_date__month=month)
@@ -8421,8 +7933,8 @@ def monthly_sales_report(request):
 
 import calendar
 def monthly_sales_report_print(request):
-    month = int(request.GET.get('month', datetime.now().month))
-    year = datetime.now().year  
+    month = int(request.GET.get('month', datetime.datetime.now().month))
+    year = datetime.datetime.now().year  
 
     month_name = calendar.month_name[month]
 
@@ -8477,62 +7989,69 @@ def monthly_sales_report_print(request):
     }
     return render(request, 'sales_management/salesman_monthly_sales_print.html', context)
 
-from django.utils.timezone import make_aware
+
 
 def detailed_sales_report(request):
-    current_year = datetime.now().year
-    year_choices = [(str(year), str(year)) for year in range(current_year - 5, current_year + 1)]  
+
+    current_date = datetime.datetime.now()
+    default_from_date = current_date.replace(day=1)
+    default_to_date = (default_from_date + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+
+    # Parse from_date and to_date from query params
+    from_date_str = request.GET.get('from_date')
+    to_date_str = request.GET.get('to_date')
+
+    try:
+        start_date = make_aware(datetime.datetime.strptime(from_date_str, "%Y-%m-%d")) if from_date_str else make_aware(default_from_date)
+        end_date = make_aware(datetime.datetime.strptime(to_date_str, "%Y-%m-%d")) if to_date_str else make_aware(default_to_date)
+    except ValueError:
+        start_date, end_date = make_aware(default_from_date), make_aware(default_to_date)
+
+    year_choices = [(str(year), str(year)) for year in range(current_date.year - 5, current_date.year + 1)]
     month_choices = [(f"{month:02}", calendar.month_name[month]) for month in range(1, 13)]
     
-    selected_year = request.GET.get('year', str(current_year)) 
-    selected_month = request.GET.get('month')
-    
-    try:
-        if selected_month and selected_year:
-            start_date = datetime.datetime.strptime(f"{selected_year}-{selected_month}-01", "%Y-%m-%d")
-            
-            next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
-            end_date = next_month - timedelta(days=1)
-           
-        else:
-            start_date = datetime.now().replace(day=1)
-            next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
-            end_date = next_month - timedelta(days=1)
-           
-        start_date, end_date = make_aware(start_date), make_aware(end_date)
-    except ValueError:
-        start_date, end_date = None, None
-
     routes = RouteMaster.objects.all()
 
     return render(request, 'sales_management/route_sales_report.html', {
         'routes': routes,
         'month_choices': month_choices,
         'year_choices': year_choices,
-        'selected_year': selected_year,
-        'selected_month': selected_month,
+        'selected_year': start_date.year,
+        'selected_month': f"{start_date.month:02}",
         'start_date': start_date,
         'end_date': end_date,
+        'from_date': start_date.date().isoformat(),
+        'to_date': end_date.date().isoformat(),
     })
    
 def print_sales_report(request):
-    current_year = datetime.now().year
-    current_month = datetime.now().month  
-    year_choices = [(str(year), str(year)) for year in range(current_year - 5, current_year + 1)]  
+    current_year = datetime.datetime.now().year
+    current_month = datetime.datetime.now().month
+
+    # Choices for dropdowns
+    year_choices = [(str(year), str(year)) for year in range(current_year - 5, current_year + 1)]
     month_choices = [(f"{month:02}", calendar.month_name[month]) for month in range(1, 13)]
 
-    selected_year = request.GET.get('year', str(current_year))
-    selected_month = request.GET.get('month', str(current_month).zfill(2))  
-
-    if selected_month == 'None' or selected_month is None:
-        selected_month = str(current_month).zfill(2)  
+    # GET Params
+    selected_year = request.GET.get('year')
+    selected_month = request.GET.get('month')
+    from_date_str = request.GET.get('from_date')
+    to_date_str = request.GET.get('to_date')
 
     try:
-        start_date = datetime.datetime.strptime(f"{selected_year}-{selected_month}-01", "%Y-%m-%d")
-        next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
-        end_date = next_month - timedelta(days=1)
-
-        start_date, end_date = make_aware(start_date), make_aware(end_date)
+        if from_date_str and to_date_str:
+            start_date = make_aware(datetime.datetime.strptime(from_date_str, "%Y-%m-%d"))
+            end_date = make_aware(datetime.datetime.strptime(to_date_str, "%Y-%m-%d"))
+            selected_year = start_date.year
+            selected_month = f"{start_date.month:02}"
+        else:
+            selected_year = selected_year or str(current_year)
+            selected_month = selected_month or str(current_month).zfill(2)
+            start_date = datetime.datetime.strptime(f"{selected_year}-{selected_month}-01", "%Y-%m-%d")
+            next_month = (start_date.replace(day=28) + timedelta(days=4)).replace(day=1)
+            end_date = next_month - timedelta(days=1)
+            start_date = make_aware(start_date)
+            end_date = make_aware(end_date)
     except ValueError as e:
         start_date, end_date = None, None
         print(f"Error parsing dates: {e}")
@@ -8545,13 +8064,14 @@ def print_sales_report(request):
         'year_choices': year_choices,
         'selected_year': selected_year,
         'selected_month': selected_month,
+        'from_date': start_date.date().isoformat() if start_date else '',
+        'to_date': end_date.date().isoformat() if end_date else '',
         'start_date': start_date,
         'end_date': end_date,
     })
     
-    
 def routewise_sales_report(request, route_id):
-    today = datetime.now()
+    today = datetime.datetime.now()
     current_year = today.year
     current_month = today.month
 
@@ -8575,6 +8095,15 @@ def routewise_sales_report(request, route_id):
     van_route = Van_Routes.objects.filter(routes=route_id).first()
     
     coupon_items_instances = CouponType.objects.all()
+    
+    if start_date and end_date:
+        date_list = []
+        current = start_date
+        while current <= end_date:
+            date_list.append(current)
+            current += timedelta(days=1)
+    else:
+        date_list = []
 
     return render(request, 'sales_management/routewise_sales_report.html', {
         'route': route,
@@ -8588,11 +8117,12 @@ def routewise_sales_report(request, route_id):
         'current_year': current_year,  
         'current_month': f"{current_month:02}",
         'coupon_items_instances': coupon_items_instances,
-        'coupon_items_instances_length': coupon_items_instances.count()
+        'coupon_items_instances_length': coupon_items_instances.count(),
+        'date_list': date_list,
     })
     
 def print_routewise_sales_report(request, route_id):
-    today = datetime.now()
+    today = datetime.datetime.now()
     current_year = today.year
     current_month = today.month
 
@@ -8996,7 +8526,7 @@ def cheque_collections_view(request):
             collection_list.append({
                 "collection_id": collection.id,
                 "customer": collection.customer.customer_name,
-                "route": collection.customer.routes.route_name ,
+                "route": collection.customer.routes.route_name if collection.customer.routes else "No Route",
                 "custom_id": collection.customer.custom_id,
                 "payment_method": "Cheque",
                 "details": cheque_details,
@@ -9020,126 +8550,241 @@ def cheque_collections_view(request):
         'filter_data': filter_data,
     })
 
-import logging
-
-logger = logging.getLogger(__name__)  
 
 def cheque_clearance(request, collection_id):
     try:
         collection = get_object_or_404(CollectionPayment, pk=collection_id)
         customer = collection.customer
         amount_received = collection.amount_received
-        receipt_number = collection.receipt_number
-        
-        logger.info(f"Processing cheque clearance for Collection ID: {collection_id}, Customer: {customer.customer_name}")
-        
+
         with transaction.atomic():
             remaining_amount = Decimal(amount_received)
-            logger.info(f"Initial remaining amount: {remaining_amount}")
-            
-            collection_items = collection.collectionitems_set.all()
             invoice_numbers = []
-            
-            for collection_item in collection_items:
-                invoice = collection_item.invoice
-                if invoice:
-                    invoice_amount_due = invoice.amout_total - invoice.amout_recieved
-                    logger.info(f"Processing Invoice {invoice.invoice_no}: Total: {invoice.amout_total}, Received: {invoice.amout_recieved}, Due: {invoice_amount_due}")
-                    
-                    if invoice_amount_due < 0:
-                        remaining_amount += abs(invoice_amount_due)
 
-            collection.amount_received = amount_received  
-            collection.receipt_number = receipt_number  
-            collection.save()
-            logger.info(f"Updated Collection: {collection.receipt_number}, Amount Received: {collection.amount_received}")
+            # Get invoices linked to this cheque
+            invoices = Invoice.objects.filter(
+                collectionitems__collection_payment=collection
+            ).distinct().order_by("created_date")
 
-            for collection_item in collection_items:
-                invoice = collection_item.invoice
-                if invoice.amout_total > invoice.amout_recieved:
+            for invoice in invoices:
+                if invoice.amout_total > invoice.amout_recieved and remaining_amount > 0:
                     invoice_numbers.append(invoice.invoice_no)
-                    due_amount = invoice.amout_total - invoice.amout_recieved
-                    
-                    payment_amount = min(remaining_amount, due_amount)
-                    invoice.amout_recieved += payment_amount
-                    invoice.save()
 
+                    due_amount = invoice.amout_total - invoice.amout_recieved
+                    payment_amount = min(due_amount, remaining_amount)
+
+                    # Record in CollectionItems (only this cheque portion)
                     CollectionItems.objects.create(
                         invoice=invoice,
-                        amount=invoice.amout_total,
-                        balance=invoice.amout_total - invoice.amout_recieved,
+                        amount=payment_amount,
+                        balance=due_amount - payment_amount,  # remaining after this clearance
                         amount_received=payment_amount,
-                        collection_payment=collection
+                        collection_payment=collection,
                     )
-                    
-                    if CustomerOutstandingReport.objects.filter(customer=customer, product_type="amount").exists():
-                        outstanding_instance = CustomerOutstandingReport.objects.get(customer=customer, product_type="amount")
-                        outstanding_instance.value -= payment_amount
-                        outstanding_instance.save()
 
+                    # Update invoice
+                    invoice.amout_recieved += payment_amount
+                    if invoice.amout_recieved >= invoice.amout_total:
+                        invoice.invoice_status = "paid"
+                    invoice.save()
+
+                    # Update outstanding
+                    outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
+                        customer=customer, product_type="amount", defaults={"value": 0}
+                    )
+                    outstanding_instance.value -= payment_amount
+                    outstanding_instance.save()
+
+                    # Decrease remaining cheque amount
                     remaining_amount -= payment_amount
-                    
-                    if invoice.amout_recieved == invoice.amout_total:
-                        invoice.invoice_status = 'paid'
-                        invoice.save()
-                    
-                    logger.info(f"Invoice {invoice.invoice_no} paid: {payment_amount}, Remaining balance: {invoice.amout_total - invoice.amout_recieved}")
-                else:
-                    logger.info(f"Invoice {invoice.invoice_no} is already fully paid. Skipping.")
-                    
-            receipt, created = Receipt.objects.update_or_create(
+
+            # Generate / update receipt
+            receipt, _ = Receipt.objects.update_or_create(
                 instance_id=str(collection.id),
                 transaction_type="collection",
                 defaults={
                     "amount_received": amount_received,
-                    "receipt_number": receipt_number,
                     "customer": customer,
-                    "invoice_number": ",".join(invoice_numbers)
+                    "invoice_number": ",".join(invoice_numbers),
+                    "created_date": datetime.datetime.today().now(),
                 }
             )
-            
-            logger.info(f"Receipt {receipt.receipt_number} {'created' if created else 'updated'} for Customer: {customer.customer_name}")
-            
+            collection.receipt_number = receipt.receipt_number
+            collection.save()
+
+            # Handle overpayment -> create refund invoice
             if remaining_amount > 0:
-                logger.info(f"Remaining Amount after invoice payments: {remaining_amount}")
                 outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
-                    customer=customer, product_type="amount"
+                    customer=customer, product_type="amount", defaults={"value": 0}
                 )
                 outstanding_instance.value += remaining_amount
                 outstanding_instance.save()
-                
-                invoice = Invoice.objects.create(
-                    # invoice_no=generate_invoice_no(datetime.datetime.today().date()),
-                    created_date=datetime.datetime.today(),
-                    net_taxable=remaining_amount,
-                    vat=0,
-                    discount=0,
-                    amout_total=remaining_amount,
-                    amout_recieved=0,
-                    customer=customer,
-                    reference_no=f"custom_id{customer.custom_id}"
-                )
-                
-                item = ProdutItemMaster.objects.get(product_name="5 Gallon")
-                InvoiceItems.objects.create(
-                    category=item.category,
-                    product_items=item,
-                    qty=0,
-                    rate=customer.rate,
-                    invoice=invoice,
-                    remarks=f'Invoice generated from collection: {invoice.reference_no}'
-                )
-                
-                logger.info(f"Refund Invoice {invoice.invoice_no} created for Remaining Amount: {remaining_amount}")
 
+                # refund_invoice = Invoice.objects.create(
+                #     created_date=datetime.datetime.today(),
+                #     net_taxable=-remaining_amount,
+                #     vat=0,
+                #     discount=0,
+                #     amout_total=-remaining_amount,
+                #     amout_recieved=0,
+                #     customer=customer,
+                #     reference_no=f"custom_id{customer.custom_id}"
+                # )
+
+                # item = ProdutItemMaster.objects.get(product_name="5 Gallon")
+                # InvoiceItems.objects.create(
+                #     category=item.category,
+                #     product_items=item,
+                #     qty=0,
+                #     rate=customer.rate,
+                #     invoice=refund_invoice,
+                #     remarks=f"Refund invoice created from cheque clearance {refund_invoice.reference_no}",
+                # )
+
+            # Mark cheque as cleared
             CollectionCheque.objects.filter(collection_payment=collection).update(status="CLEARED")
-            
-            return JsonResponse({"message": "Cheque clearance completed successfully."}, status=200)
-    
-    except Exception as e:
-        logger.error(f"Error during cheque clearance: {e}")
-        return JsonResponse({"error": f"An unexpected error occurred: {str(e)}"}, status=500)
 
+            redirect_url = reverse("cheque_collections")
+            response_data = {
+                "status": "true",
+                "title": "Cheque Cleared",
+                "message": f"Cheque clearance completed successfully for {customer.customer_name}",
+                "redirect": "true",
+                "redirect_url": redirect_url,
+            }
+            return HttpResponse(json.dumps(response_data), content_type="application/javascript")
+
+    except Exception as e:
+        response_data = {
+            "status": "false",
+            "title": "Error",
+            "message": f"An unexpected error occurred: {str(e)}",
+            "redirect": "false",
+        }
+        return HttpResponse(json.dumps(response_data), content_type="application/javascript")
+    
+    
+# def cheque_clearance(request, collection_id):
+#     try:
+#         collection = get_object_or_404(CollectionPayment, pk=collection_id)
+#         customer = collection.customer
+#         amount_received = collection.amount_received
+#         receipt_number = collection.receipt_number
+
+#         with transaction.atomic():
+#             remaining_amount = Decimal(amount_received)
+#             collection_items = collection.collectionitems_set.all()
+#             invoice_numbers = []
+
+#             # adjust overpayments
+#             for collection_item in collection_items:
+#                 invoice = collection_item.invoice
+#                 if invoice:
+#                     invoice_amount_due = invoice.amout_total - invoice.amout_recieved
+#                     if invoice_amount_due < 0:
+#                         remaining_amount += abs(invoice_amount_due)
+
+#             # update collection
+#             collection.amount_received = amount_received
+#             collection.receipt_number = receipt_number
+#             collection.save()
+
+#             # apply payments
+#             for collection_item in collection_items:
+#                 invoice = collection_item.invoice
+#                 if invoice.amout_total > invoice.amout_recieved:
+#                     invoice_numbers.append(invoice.invoice_no)
+#                     due_amount = invoice.amout_total - invoice.amout_recieved
+#                     payment_amount = min(remaining_amount, due_amount)
+
+#                     invoice.amout_recieved += payment_amount
+#                     invoice.save()
+
+#                     CollectionItems.objects.create(
+#                         invoice=invoice,
+#                         amount=invoice.amout_total,
+#                         balance=invoice.amout_total - invoice.amout_recieved,
+#                         amount_received=payment_amount,
+#                         collection_payment=collection
+#                     )
+
+#                     outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
+#                         customer=customer, product_type="amount"
+#                     )
+#                     outstanding_instance.value -= payment_amount
+#                     outstanding_instance.save()
+
+#                     remaining_amount -= payment_amount
+
+#                     if invoice.amout_recieved == invoice.amout_total:
+#                         invoice.invoice_status = 'paid'
+#                         invoice.save()
+
+#             # create or update receipt
+#             Receipt.objects.update_or_create(
+#                 instance_id=str(collection.id),
+#                 transaction_type="collection",
+#                 defaults={
+#                     "amount_received": amount_received,
+#                     "receipt_number": receipt_number,
+#                     "customer": customer,
+#                     "invoice_number": ",".join(invoice_numbers)
+#                 }
+#             )
+
+#             # handle remaining balance
+#             if remaining_amount > 0:
+#                 outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
+#                     customer=customer, product_type="amount"
+#                 )
+#                 outstanding_instance.value += remaining_amount
+#                 outstanding_instance.save()
+
+#                 # invoice = Invoice.objects.update(
+#                 #     created_date=collection.created_date or timezone.now(),
+#                 #     net_taxable=remaining_amount,
+#                 #     vat=0,
+#                 #     discount=0,
+#                 #     amout_total=remaining_amount,
+#                 #     amout_recieved=0,
+#                 #     customer=customer,
+#                 #     reference_no=f"custom_id{customer.custom_id}"
+#                 # )
+
+#                 # item = ProdutItemMaster.objects.get(product_name="5 Gallon")
+#                 # InvoiceItems.objects.create(
+#                 #     category=item.category,
+#                 #     product_items=item,
+#                 #     qty=0,
+#                 #     rate=customer.rate,
+#                 #     invoice=invoice,
+#                 #     remarks=f'Invoice generated from collection: {invoice.reference_no}'
+#                 # )
+
+#             # mark cheque as cleared
+#             CollectionCheque.objects.filter(collection_payment=collection).update(status="CLEARED")
+
+#             # ✅ response in same format as create_customer_outstanding
+#             redirect_url = reverse('cheque_collections')  # adjust name if needed
+#             response_data = {
+#                 "status": "true",
+#                 "title": "Cheque Cleared",
+#                 "message": f"Cheque clearance completed successfully for {customer.customer_name}",
+#                 "redirect": "true",
+#                 "redirect_url": redirect_url,
+#             }
+#             return HttpResponse(json.dumps(response_data), content_type="application/javascript")
+
+#     except Exception as e:
+#         response_data = {
+#             "status": "false",
+#             "title": "Error",
+#             "message": f"An unexpected error occurred: {str(e)}",
+#             "redirect": "false",
+#         }
+#         return HttpResponse(json.dumps(response_data), content_type="application/javascript")
+    
+    
 
 def production_onload_report_view(request):
 # Get today's date in dd-mm-yyyy format
@@ -9595,735 +9240,334 @@ def route_wise_bottle_count(request):
     
     return render(request, "sales_management/route_wise_bottle_count.html", context)
 
+# def custody_custom_list(request):
+#     """
+#     Fetches all custody records along with their customer details.
+#     """
+#     custody_records = CustodyCustom.objects.select_related('customer').all().order_by('-created_date')
+#     return render(request, 'sales_management/custody_custom_list.html', {'custody_records': custody_records})
 
-from collections import defaultdict
+def custody_custom_list(request):
+    custody_records = CustodyCustom.objects.select_related('customer').all()
 
-def credit_coupon_sales_report(request):
-    # Get date filter inputs from GET request
+    # Get today's date
+    today = now().date()
+
+    # Get filter parameters
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-
-    # Parse dates using strptime
-    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else None
-    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else None
-
-    # Step 1: Filter relevant customers
-    outstanding_customers = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    # Step 2: Filter CustomerCoupon records by customer and date
-    coupons = CustomerCoupon.objects.filter(
-        customer_id__in=outstanding_customers
-    ).select_related('customer', 'customer__routes')
-
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Step 3: Group data by route
-    route_data = defaultdict(lambda: {'total_books': 0, 'grand_total': 0, 'amount_received': 0})
-
-    for coupon in coupons:
-        customer = coupon.customer
-        route_name = customer.routes.route_name if customer.routes else 'Unknown'
-
-        total_books = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer_id=customer.customer_id,
-            customer_outstanding__customer__is_deleted=False,
-        ).aggregate(total=Sum('count'))['total'] or 0
-
-        route_data[route_name]['total_books'] += total_books
-        route_data[route_name]['grand_total'] += coupon.grand_total or 0
-        route_data[route_name]['amount_received'] += coupon.amount_recieved or 0
-
-    # Step 4: Build final summary list
-    route_summary = []
-    for route, data in route_data.items():
-        balance = data['grand_total'] - data['amount_received']
-        route_summary.append({
-            'route': route,
-            'total_books': data['total_books'],
-            'grand_total': data['grand_total'],
-            'amount_received': data['amount_received'],
-            'balance': balance,
-        })
-
-    context = {
-        'route_summary': route_summary,
-        'filter_data': {
-            'start_date': start_date,
-            'end_date': end_date,
-        },
-    }
-
-    return render(request, 'sales_management/credit_coupon_sales_report.html', context)
-
-def credit_coupon_sales_print(request):
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    # Validate and parse date inputs only if valid
-    try:
-        start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date and start_date != 'None' else None
-    except ValueError:
-        start_date_obj = None
-
-    try:
-        end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date and end_date != 'None' else None
-    except ValueError:
-        end_date_obj = None
-
-    # Step 1: Filter relevant customers
-    outstanding_customers = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    # Step 2: Filter CustomerCoupon records by customer and date
-    coupons = CustomerCoupon.objects.filter(
-        customer_id__in=outstanding_customers
-    ).select_related('customer', 'customer__routes')
-
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Step 3: Group data by route
-    route_data = defaultdict(lambda: {'total_books': 0, 'grand_total': 0, 'amount_received': 0})
-
-    for coupon in coupons:
-        customer = coupon.customer
-        route_name = customer.routes.route_name if customer.routes else 'Unknown'
-
-        total_books = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer_id=customer.customer_id
-        ).aggregate(total=Sum('count'))['total'] or 0
-
-        route_data[route_name]['total_books'] += total_books
-        route_data[route_name]['grand_total'] += coupon.grand_total or 0
-        route_data[route_name]['amount_received'] += coupon.amount_recieved or 0
-
-    # Step 4: Build final summary list
-    route_summary = []
-    for route, data in route_data.items():
-        balance = data['grand_total'] - data['amount_received']
-        route_summary.append({
-            'route': route,
-            'total_books': data['total_books'],
-            'grand_total': data['grand_total'],
-            'amount_received': data['amount_received'],
-            'balance': balance,
-        })
-
-    context = {
-        'route_summary': route_summary,
-        'filter_data': {
-            'start_date': start_date if start_date != 'None' else '',
-            'end_date': end_date if end_date != 'None' else '',
-        },
-    }
-
-    return render(request, 'sales_management/credit_coupon_sales_print.html', context)
-
-
-def credit_coupon_sales_excel(request):
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    try:
-        start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date and start_date != 'None' else None
-    except ValueError:
-        start_date_obj = None
-
-    try:
-        end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date and end_date != 'None' else None
-    except ValueError:
-        end_date_obj = None
-
-    # Step 1: Filter relevant customers
-    outstanding_customers = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    # Step 2: Filter coupons
-    coupons = CustomerCoupon.objects.filter(
-        customer_id__in=outstanding_customers
-    ).select_related('customer', 'customer__routes')
-
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Step 3: Aggregate by route
-    route_data = defaultdict(lambda: {'total_books': 0, 'grand_total': 0, 'amount_received': 0})
-
-    for coupon in coupons:
-        customer = coupon.customer
-        route_name = customer.routes.route_name if customer.routes else 'Unknown'
-
-        total_books = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer_id=customer.customer_id
-        ).aggregate(total=Sum('count'))['total'] or 0
-
-        route_data[route_name]['total_books'] += total_books
-        route_data[route_name]['grand_total'] += coupon.grand_total or 0
-        route_data[route_name]['amount_received'] += coupon.amount_recieved or 0
-
-    # Step 4: Create workbook and sheet
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
-    sheet.title = "Credit Coupon Sales"
-
-    # Step 5: Write headers
-    headers = ['Sl.No', 'Route', 'Number of Books Sold in Credit', 'Amount', 'Amount Received', 'Balance']
-    for col_num, header in enumerate(headers, start=1):
-        cell = sheet.cell(row=1, column=col_num, value=header)
-
-    # Step 6: Fill in data
-    for idx, (route, data) in enumerate(route_data.items(), start=2):
-        balance = data['grand_total'] - data['amount_received']
-        sheet.cell(row=idx, column=1, value=idx - 1)
-        sheet.cell(row=idx, column=2, value=route)
-        sheet.cell(row=idx, column=3, value=data['total_books'])
-        sheet.cell(row=idx, column=4, value=data['grand_total'])
-        sheet.cell(row=idx, column=5, value=data['amount_received'])
-        sheet.cell(row=idx, column=6, value=balance)
-
-    # Step 7: Set response and return file
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = 'attachment; filename="credit_coupon_sales_report.xlsx"'
-    workbook.save(response)
-    return response
-
-def credit_coupon_sales_detail(request, route):
-    # Retrieve date filters from GET parameters
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    # Parse dates using strptime
-    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date and start_date != 'None' else None
-    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date and end_date != 'None' else None
-
-    # Step 1: Filter customers based on route and existence in CustomerOutstanding with product_type='coupons'
-    eligible_customer_ids = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__routes__route_name=route,
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    customers = Customers.objects.filter(
-        customer_id__in=eligible_customer_ids,
-        routes__route_name=route,
-        is_deleted=False,
-        
-    )
-
-    # Step 2: Filter CustomerCoupon records for these customers
-    coupons = CustomerCoupon.objects.filter(customer__in=customers)
-
-    # Apply date filters if provided
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Prepare data for the template
-    report_data = []
-    total_amount = 0
-    total_received = 0
-    total_balance = 0
-
-    for coupon in coupons:
-        customer = coupon.customer
-        balance = (coupon.grand_total or 0) - (coupon.amount_recieved or 0)
-        report_data.append({
-            'customer_id': customer.custom_id,
-            'customer_name': customer.customer_name,
-            'book_no': coupon.invoice_no,
-            'date_of_sales': coupon.created_date.date(),
-            'amount': coupon.grand_total or 0,
-            'received': coupon.amount_recieved or 0,
-            'balance': balance,
-        })
-        total_amount += coupon.grand_total or 0
-        total_received += coupon.amount_recieved or 0
-        total_balance += balance
-
-    context = {
-        'route': route,
-        'report_data': report_data,
-        'total_amount': total_amount,
-        'total_received': total_received,
-        'total_balance': total_balance,
-        'filter_data': {
-            'start_date': start_date,
-            'end_date': end_date,
-        },
-    }
-
-    return render(request, 'sales_management/credit_coupon_sales_detail.html', context)
-
-def credit_coupon_sales_pdf(request, route):
-    # Retrieve date filters from GET parameters
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    # Parse dates using strptime
-    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date and start_date != 'None' else None
-    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date and end_date != 'None' else None
-
-    # Step 1: Filter customers based on route and existence in CustomerOutstanding with product_type='coupons'
-    eligible_customer_ids = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__routes__route_name=route,
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    customers = Customers.objects.filter(
-        customer_id__in=eligible_customer_ids,
-        routes__route_name=route,
-        is_deleted=False,
-        
-    )
-
-    # Step 2: Filter CustomerCoupon records for these customers
-    coupons = CustomerCoupon.objects.filter(customer__in=customers)
-
-    # Apply date filters if provided
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Prepare data for the template
-    report_data = []
-    total_amount = 0
-    total_received = 0
-    total_balance = 0
-
-    for coupon in coupons:
-        customer = coupon.customer
-        balance = (coupon.grand_total or 0) - (coupon.amount_recieved or 0)
-        report_data.append({
-            'customer_id': customer.custom_id,
-            'customer_name': customer.customer_name,
-            'book_no': coupon.invoice_no,
-            'date_of_sales': coupon.created_date.date(),
-            'amount': coupon.grand_total or 0,
-            'received': coupon.amount_recieved or 0,
-            'balance': balance,
-        })
-        total_amount += coupon.grand_total or 0
-        total_received += coupon.amount_recieved or 0
-        total_balance += balance
-
-    context = {
-        'route': route,
-        'report_data': report_data,
-        'total_amount': total_amount,
-        'total_received': total_received,
-        'total_balance': total_balance,
-        'filter_data': {
-            'start_date': start_date,
-            'end_date': end_date,
-        },
-    }
-
-    return render(request, 'sales_management/credit_coupon_sales_pdf.html', context)
-
-def credit_coupon_sales_export(request, route):
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-
-    start_date_obj = datetime.datetime.strptime(start_date, '%Y-%m-%d').date() if start_date and start_date != 'None' else None
-    end_date_obj = datetime.datetime.strptime(end_date, '%Y-%m-%d').date() if end_date and end_date != 'None' else None
-
-    # Step 1: Filter eligible customers
-    eligible_customer_ids = CustomerOutstanding.objects.filter(
-        product_type='coupons',
-        customer__routes__route_name=route,
-        customer__is_deleted=False,
-        
-    ).values_list('customer_id', flat=True)
-
-    customers = Customers.objects.filter(
-        customer_id__in=eligible_customer_ids,
-        routes__route_name=route,
-        is_deleted=False,
-        
-    )
-
-    # Step 2: Filter coupon records
-    coupons = CustomerCoupon.objects.filter(customer__in=customers)
-
-    if start_date_obj:
-        coupons = coupons.filter(created_date__gte=start_date_obj)
-    if end_date_obj:
-        coupons = coupons.filter(created_date__lte=end_date_obj)
-
-    # Step 3: Create workbook and sheet
-    workbook = openpyxl.Workbook()
-    sheet = workbook.active
-    sheet.title = "Credit Coupon Sales"
-
-    # Step 4: Write headers
-    headers = ["Sl.No", "Route", "Customer ID", "Customer Name", "Book No", "Date of Sales", "Amount", "Received", "Balance"]
-    sheet.append(headers)
-
-    # Step 5: Write data rows
-    total_amount = 0
-    total_received = 0
-    total_balance = 0
-
-    for idx, coupon in enumerate(coupons, start=1):
-        customer = coupon.customer
-        route_name = customer.routes.route_name if customer.routes else ""
-        amount = coupon.grand_total or 0
-        received = coupon.amount_recieved or 0
-        balance = amount - received
-        sheet.append([
-            idx,
-            route_name,
-            customer.custom_id,
-            customer.customer_name,
-            coupon.invoice_no,
-            coupon.created_date.strftime('%Y-%m-%d'),
-            float(amount),
-            float(received),
-            float(balance)
-        ])
-        total_amount += amount
-        total_received += received
-        total_balance += balance
-
-    # Step 6: Append totals row
-    sheet.append([
-        "", "", "", "", "", "Total",
-        float(total_amount),
-        float(total_received),
-        float(total_balance)
-    ])
-
-    # Step 7: Return response
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = 'attachment; filename="credit_coupon_sales_report.xlsx"'
-    workbook.save(response)
-    return response
-
-def manual_coupon_detail_view(request):
-    # Default dates: yesterday to today
-    today = timezone.now().date()
-    yesterday = today - timedelta(days=1)
-
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    route_name = request.GET.get('route_name')
-    q = request.GET.get('q', '').strip()
-
-    try:
-        start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else yesterday
-        end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else today
-    except ValueError:
-        start_date = yesterday
-        end_date = today
-
-    manual_items = CustomerCouponItems.objects.filter(
-        customer_coupon__coupon_method='manual',
-        customer_coupon__created_date__date__range=(start_date, end_date)
-    ).select_related('coupon', 'customer_coupon', 'customer_coupon__customer').order_by('-customer_coupon__created_date')
-    
-    if route_name:
-        manual_items = manual_items.filter(customer_coupon__customer__routes__route_name=route_name)
-    if q:
-        manual_items = manual_items.filter(
-            Q(customer_coupon__customer__routes__route_name__icontains=q) |
-            Q(customer_coupon__customer__custom_id__icontains=q) |
-            Q(customer_coupon__customer__customer_name__icontains=q) |
-            Q(coupon__book_num__icontains=q) |
-            Q(rate__icontains=q)
-        )
-
-    grouped_data = {}
-    sl_no = 1
-
-    for item in manual_items:
-        coupon = item.coupon
-        customer = item.customer_coupon.customer
-        key = (customer.custom_id, customer.customer_name, coupon.book_num, item.customer_coupon.created_date)
-
-        sold_leaflets = item.get_avg_rate() or 0
-        per_leaf_rate = item.rate or 0
-
-        if key not in grouped_data:
-            grouped_data[key] = {
-                'sl_no': sl_no,
-                'route_name':customer.routes.route_name,
-                'customer_id': customer.custom_id,
-                'customer_name': customer.customer_name,
-                'book_no': coupon.book_num,
-                'sold': sold_leaflets,
-                'rate': round(per_leaf_rate, 2),
-                'date': item.customer_coupon.created_date.strftime('%d/%m/%Y'),
-            }
-            sl_no += 1
-        else:
-            grouped_data[key]['sold'] += sold_leaflets
-
-    total_rate = sum(item['rate'] for item in grouped_data.values())
-    total_sold = sum(item['sold'] for item in grouped_data.values())
-    
-    # Get distinct route instances
-    routes_instances = RouteMaster.objects.filter(
-        route_name__in=Customers.objects.filter(is_deleted=False)
-        .values_list('routes__route_name', flat=True).distinct()
-    )
-
-    return render(request, 'sales_management/manual_coupon_detail.html', {
-        'items': list(grouped_data.values()),
-        'total_rate': round(total_rate, 2),
-        'total_sold': total_sold,
-        'routes_instances': routes_instances,
-        'filter_data': {
-                'filter_date_from': start_date.strftime('%Y-%m-%d'),
-                'filter_date_to': end_date.strftime('%Y-%m-%d'),
-                'route_name': route_name,
-            },
-            'q': q,
-        })
-
-
-def manual_coupon_print_view(request):
-    # Default dates: yesterday to today
-    today = timezone.now().date()
-    yesterday = today - timedelta(days=1)
-
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    route_name = request.GET.get('route_name')
-    q = request.GET.get('q', '').strip()
-
-
-    try:
-        start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else yesterday
-        end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else today
-    except ValueError:
-        start_date = yesterday
-        end_date = today
-
-    manual_items = CustomerCouponItems.objects.filter(
-        customer_coupon__coupon_method='manual',
-        customer_coupon__created_date__date__range=(start_date, end_date)
-    ).select_related('coupon', 'customer_coupon', 'customer_coupon__customer').order_by('-customer_coupon__created_date')
-    
-    if route_name:
-        manual_items = manual_items.filter(customer_coupon__customer__routes__route_name=route_name)
-    if q:
-            manual_items = manual_items.filter(
-                Q(customer_coupon__customer__routes__route_name__icontains=q) |
-                Q(customer_coupon__customer__custom_id__icontains=q) |
-                Q(customer_coupon__customer__customer_name__icontains=q) |
-                Q(coupon__book_num__icontains=q) |
-                Q(rate__icontains=q)
-            )
-    grouped_data = {}
-    sl_no = 1
-
-    for item in manual_items:
-        coupon = item.coupon
-        customer = item.customer_coupon.customer
-        key = (customer.custom_id, customer.customer_name, coupon.book_num, item.customer_coupon.created_date)
-
-        sold_leaflets = item.get_avg_rate() or 0
-        per_leaf_rate = item.rate or 0
-
-        if key not in grouped_data:
-            grouped_data[key] = {
-                'sl_no': sl_no,
-                'route_name':customer.routes.route_name,
-                'customer_id': customer.custom_id,
-                'customer_name': customer.customer_name,
-                'book_no': coupon.book_num,
-                'sold': sold_leaflets,
-                'rate': round(per_leaf_rate, 2),
-                'date': item.customer_coupon.created_date.strftime('%d/%m/%Y'),
-            }
-            sl_no += 1
-        else:
-            grouped_data[key]['sold'] += sold_leaflets
-
-    total_rate = sum(item['rate'] for item in grouped_data.values())
-    total_sold = sum(item['sold'] for item in grouped_data.values())
-    # Get distinct route instances
-    routes_instances = RouteMaster.objects.filter(
-        route_name__in=Customers.objects.filter(is_deleted=False)
-        .values_list('routes__route_name', flat=True).distinct()
-    )
-    return render(request, 'sales_management/manual_coupon_print_view.html', {
-        'items': list(grouped_data.values()),
-        'total_rate': round(total_rate, 2),
-        'total_sold': total_sold,
-        'routes_instances': routes_instances,
-        'filter_data': {
-                'filter_date_from': start_date.strftime('%Y-%m-%d'),
-                'filter_date_to': end_date.strftime('%Y-%m-%d'),
-                'route_name': route_name,
-            },
-            'q': q,
-        })
-
-def manual_coupon_detail_excel(request):
-    today = timezone.now().date()
-    yesterday = today - timedelta(days=1)
-
-    start_date_str = request.GET.get('start_date')
-    end_date_str = request.GET.get('end_date')
-    route_name = request.GET.get('route_name')
-    q = request.GET.get('q', '').strip()
-
-    try:
-        start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date() if start_date_str else yesterday
-        end_date = datetime.datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else today
-    except ValueError:
-        start_date = yesterday
-        end_date = today
-
-    manual_items = CustomerCouponItems.objects.filter(
-        customer_coupon__coupon_method='manual',
-        customer_coupon__created_date__date__range=(start_date, end_date)
-    ).select_related('coupon', 'customer_coupon', 'customer_coupon__customer').order_by('-customer_coupon__created_date')
-
-    if route_name:
-        manual_items = manual_items.filter(customer_coupon__customer__routes__route_name=route_name)
-
-    if q:
-        manual_items = manual_items.filter(
-            Q(customer_coupon__customer__routes__route_name__icontains=q) |
-            Q(customer_coupon__customer__custom_id__icontains=q) |
-            Q(customer_coupon__customer__customer_name__icontains=q) |
-            Q(coupon__book_num__icontains=q) |
-            Q(rate__icontains=q)
-        )
-
-    grouped_data = {}
-    sl_no = 1
-
-    for item in manual_items:
-        coupon = item.coupon
-        customer = item.customer_coupon.customer
-        key = (customer.custom_id, customer.customer_name, coupon.book_num, item.customer_coupon.created_date)
-
-        sold_leaflets = item.get_avg_rate() or 0
-        per_leaf_rate = item.rate or 0
-
-        if key not in grouped_data:
-            grouped_data[key] = {
-                'sl_no': sl_no,
-                'route_name': customer.routes.route_name if customer.routes else '',
-                'customer_id': customer.custom_id,
-                'customer_name': customer.customer_name,
-                'book_no': coupon.book_num,
-                'sold': sold_leaflets,
-                'rate': round(per_leaf_rate, 2),
-                'date': item.customer_coupon.created_date.strftime('%d/%m/%Y'),
-            }
-            sl_no += 1
-        else:
-            grouped_data[key]['sold'] += sold_leaflets
-
-    total_rate = sum(item['rate'] for item in grouped_data.values())
-    total_sold = sum(item['sold'] for item in grouped_data.values())
-
-    # Create a workbook and add a sheet
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Manually Sold Coupon Leaflets"
-
-    # Add headers
-    headers = ["Sl No", "Route", "Customer Id", "Customer Name", "Leaflet No", "Rate", "Sold", "Date"]
-    ws.append(headers)
-
-    # Add data rows
-    for item in grouped_data.values():
-        row = [
-            item['sl_no'],
-            item['route_name'],
-            item['customer_id'],
-            item['customer_name'],
-            item['book_no'],
-            item['rate'],
-            item['sold'],
-            item['date']
-        ]
-        ws.append(row)
-
-    # Add totals row
-    ws.append(["", "", "", "", "Total", total_rate, total_sold, ""])
-
-    # Set response content type for Excel
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename=manual_coupon_leaflets.xlsx'
-
-    wb.save(response)
-    return response
-
-
-def van_sales_report(request):
-    filter_data = {}
-        
-    from_date_str = request.GET.get("from_date")
-    to_date_str = request.GET.get("to_date")
-    route_pk = request.GET.get("route_pk")
-
-    if from_date_str and to_date_str:
-        from_date = datetime.datetime.strptime(from_date_str, "%Y-%m-%d").date()
-        to_date = datetime.datetime.strptime(to_date_str, "%Y-%m-%d").date()
+    query = request.GET.get('q', '').strip()  # Get search query and remove extra spaces
+
+    # Filter by date range
+    if start_date and end_date:
+        try:
+            start_date = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+            end_date = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+            custody_records = custody_records.filter(created_date__date__range=[start_date, end_date])
+        except ValueError:
+            pass  # Handle invalid date format gracefully
     else:
-        from_date = datetime.date.today()
-        to_date = datetime.date.today()
+        todays_records = custody_records.filter(created_date__date=today)
+        custody_records = todays_records if todays_records.exists() else custody_records
 
-    filter_data["from_date"] = from_date.strftime("%Y-%m-%d")
-    filter_data["to_date"] = to_date.strftime("%Y-%m-%d")
-
-    # Filter stocks for 5 Gallon only
-    instances = (
-        VanProductStock.objects.filter(
-            product__product_name="5 Gallon",
-            created_date__gte=from_date,
-            created_date__lte=to_date
+    # Apply search filter
+    if query:
+        custody_records = custody_records.filter(
+            Q(customer__customer_name__icontains=query) |
+            Q(customer__custom_id__icontains=query) |
+            Q(agreement_no__icontains=query) |
+            Q(reference_no__icontains=query)
         )
-    )
 
-    # Optional route filter
-    if route_pk:
-        route_van_ids = Van_Routes.objects.filter(routes__pk=route_pk).values_list("van__pk", flat=True)
-        instances = instances.filter(van__pk__in=route_van_ids)
-        filter_data['filter_route'] = route_pk
-
-    # Ensure only one record per van per date
-    instances = (instances.distinct().order_by("-created_date"))
-
-    route_instances = RouteMaster.objects.all()
-    
     context = {
-        "instances": instances,
-        "route_instances": route_instances,
-        "product_pk": ProdutItemMaster.objects.get(product_name="5 Gallon").pk,
-        "filter_data": filter_data,
+        "custody_records": custody_records.order_by('-created_date'),
+        "filter_data": {
+            "filter_date_from": start_date.strftime("%Y-%m-%d") if start_date else "",
+            "filter_date_to": end_date.strftime("%Y-%m-%d") if end_date else "",
+            "q": query,
+        },
     }
 
-    return render(request, "sales_management/van_sales_report.html", context)
+    return render(request, 'sales_management/custody_custom_list.html', context)
+
+def custody_custom_detail(request, custody_id):
+    custody_record = get_object_or_404(CustodyCustom, custody_custom_id=custody_id)
+    custody_items = CustodyCustomItems.objects.filter(custody_custom=custody_record)
+
+    context = {
+        "custody_record": custody_record,
+        "custody_items": custody_items,
+    }
+    
+    return render(request, 'sales_management/custody_custom_detail.html', context)
+
+
+
+def collection(request, customer_id):
+    user = request.user
+    today = now().date().strftime("%Y-%m-%d")
+
+    # Fetch customer
+    customer = get_object_or_404(Customers, pk=customer_id)
+
+    # Fetch unpaid invoices
+    invoices = Invoice.objects.filter(
+        customer=customer,
+        invoice_status="non_paid",
+        is_deleted=False
+    ).exclude(amout_total=0).order_by("-created_date")
+
+    # Calculate totals
+    total_amount = invoices.aggregate(total=Sum("amout_total"))["total"] or 0
+
+    # auto-mark paid invoices
+    for inv in invoices:
+        if inv.amout_total == inv.amout_recieved:
+            inv.invoice_status = "paid"
+            inv.save()
+
+    # Add balance amount field
+    for inv in invoices:
+        inv.balance_amount = inv.amout_total - inv.amout_recieved
+
+    # Calculate total balance pending
+    total_balance = sum(inv.balance_amount for inv in invoices)
+
+    # Log activity
+    if invoices.exists():
+        log_activity(
+            created_by=user,
+            description=f"User {user.username} viewed collection invoices for customer_id={customer_id}."
+        )
+    else:
+        log_activity(
+            created_by=user,
+            description=f"User {user.username} viewed collection but no unpaid invoices for customer_id={customer_id}."
+        )
+
+    context = {
+        "page_title": "Payment Collection",
+        "customer": customer,
+        "invoices": invoices,
+        "total_amount": total_amount,   
+        "total_balance": total_balance, 
+        "today": today
+    }
+    return render(request, "sales_management/collection.html", context)
+
+def parse_payment_date(date_str):
+    """
+    Convert 'YYYY-MM-DD' string into a timezone-aware datetime.
+    If missing/invalid, return now().
+    """
+    if not date_str:
+        return now()
+    try:
+        # Parse as date
+        dt = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        # Combine with midnight and make timezone-aware
+        return make_aware(datetime.datetime.combine(dt, datetime.datetime.min.time()))
+    except Exception:
+        return now()
+
+
+def collection_payment(request, customer_id):
+    customer = get_object_or_404(Customers, pk=customer_id)
+    salesman = Van_Routes.objects.filter(
+        routes=customer.routes,
+        van__salesman__designation_id__designation_name__in=["Sales Executive", "Salesman"]
+    ).latest("created_date").van.salesman
+
+    invoices = Invoice.objects.filter(
+        customer=customer, invoice_status="non_paid", is_deleted=False
+    ).exclude(amout_total=0)
+
+    total_amount = sum(inv.amout_total - inv.amout_recieved for inv in invoices)
+    print("invoices",invoices)
+    if request.method != "POST":
+        return JsonResponse({
+            "status": "false",
+            "title": "Invalid Request",
+            "message": "Only POST method is allowed."
+        })
+
+    try:
+        with transaction.atomic():
+            payment_method = request.POST.get("payment_method")
+            amount_received = Decimal(request.POST.get("amount_received", 0))
+            invoice_ids = request.POST.getlist("invoice_ids") or [inv.id for inv in invoices]
+
+            cheque_details = {
+                "cheque_no": request.POST.get("cheque_no"),
+                "bank_name": request.POST.get("bank_name"),
+                "cheque_date": request.POST.get("cheque_date"),
+            }
+            card_details = {
+                "customer_name": request.POST.get("customer_name"),
+                "card_number": request.POST.get("card_no"),
+                "card_date": request.POST.get("card_date"),
+                "card_type": request.POST.get("card_type"),
+                "card_category": request.POST.get("card_category"),
+            }
+
+            invoices_to_pay = Invoice.objects.filter(pk__in=invoice_ids, customer=customer).order_by("created_date")
+            if not invoices_to_pay.exists():
+                return JsonResponse({
+                    "status": "false",
+                    "title": "No Invoices",
+                    "message": "No valid invoices found."
+                })
+
+            invoice_numbers = []
+
+            payment_date_str = request.POST.get("payment_date")
+            payment_date = parse_payment_date(payment_date_str)
+
+            collection_payment = CollectionPayment.objects.create(
+                payment_method=payment_method,
+                customer=customer,
+                salesman=salesman,
+                amount_received=amount_received,
+                created_date=payment_date
+            )
+
+            # Create receipt first (will update invoice_number later)
+            receipt = Receipt.objects.create(
+                transaction_type="collection",
+                instance_id=str(collection_payment.id),
+                amount_received=amount_received,
+                customer=customer,
+                invoice_number="",
+                created_date=collection_payment.created_date
+            )
+            collection_payment.receipt_number = receipt.receipt_number
+            collection_payment.save()
+
+            remaining_amount = Decimal(amount_received)
+
+            # ---- CHEQUE PAYMENT ----
+            if payment_method.lower() == "cheque":
+                collection_cheque = CollectionCheque.objects.create(
+                    cheque_amount=amount_received,
+                    cheque_no=cheque_details.get("cheque_no"),
+                    bank_name=cheque_details.get("bank_name"),
+                    cheque_date=cheque_details.get("cheque_date"),
+                    collection_payment=collection_payment,
+                )
+                collection_cheque.invoices.set(invoices_to_pay)  
+                print("linked invoices:", list(collection_cheque.invoices.all()))
+                
+                response_data = {
+                    "status": "true",
+                    "title": "Collection Saved",
+                    "message": "Cheque payment saved successfully.",
+                    "redirect": "true",
+                    "redirect_url": reverse("cheque_collections"),  
+                }
+                return HttpResponse(json.dumps(response_data), content_type="application/javascript")
+
+            # ---- CASH / CARD PAYMENT ----
+            for invoice in invoices_to_pay:
+                if invoice.amout_total > invoice.amout_recieved:
+                    invoice_numbers.append(invoice.invoice_no)
+                    due_amount = invoice.amout_total - invoice.amout_recieved
+                    payment_amount = min(due_amount, remaining_amount)
+
+                    invoice.amout_recieved += payment_amount
+                    if invoice.amout_recieved >= invoice.amout_total:
+                        invoice.invoice_status = "paid"
+                    invoice.save()
+
+                    CollectionItems.objects.create(
+                        invoice=invoice,
+                        amount=invoice.amout_total,
+                        balance=invoice.amout_total - invoice.amout_recieved,
+                        amount_received=payment_amount,
+                        collection_payment=collection_payment
+                    )
+
+                    if payment_method.lower() == "card":
+                        CollectionCard.objects.create(
+                            collection_payment=collection_payment,
+                            customer_name=card_details.get("customer_name"),
+                            card_number=card_details.get("card_number"),
+                            card_date=card_details.get("card_date"),
+                            card_type=card_details.get("card_type"),
+                            card_category=card_details.get("card_category"),
+                            card_amount=amount_received
+                        )
+
+                    outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
+                        customer=customer, product_type="amount", defaults={"value": 0}
+                    )
+                    outstanding_instance.value -= payment_amount
+                    outstanding_instance.save()
+
+                    remaining_amount -= payment_amount
+
+                    log_activity(
+                        created_by=request.user,
+                        description=f"Invoice {invoice.invoice_no} paid: {payment_amount} received, Remaining balance: {invoice.amout_total - invoice.amout_recieved}"
+                    )
+
+                if remaining_amount <= 0:
+                    break
+
+            # update receipt with invoices
+            receipt.invoice_number = ",".join(invoice_numbers)
+            receipt.save()
+
+            # Refund logic (if extra amount left)
+            if remaining_amount > 0:
+                negative_remaining_amount = -remaining_amount
+                outstanding_instance.value += negative_remaining_amount
+                outstanding_instance.save()
+                refund_invoice = Invoice.objects.create(
+                    created_date=collection_payment.created_date,
+                    net_taxable=negative_remaining_amount,
+                    vat=0,
+                    discount=0,
+                    amout_total=negative_remaining_amount,
+                    amout_recieved=0,
+                    customer=customer,
+                    reference_no=f"custom_id{customer.custom_id}"
+                )
+                if customer.sales_type == "CREDIT":
+                    refund_invoice.invoice_type = "credit_invoice"
+                    refund_invoice.save()
+
+                item = ProdutItemMaster.objects.get(product_name="5 Gallon")
+                InvoiceItems.objects.create(
+                    category=item.category,
+                    product_items=item,
+                    qty=0,
+                    rate=customer.rate,
+                    invoice=refund_invoice,
+                    remarks=f"Invoice generated from collection: {refund_invoice.reference_no}"
+                )
+
+                log_activity(
+                    created_by=request.user,
+                    description=f"Refund invoice {refund_invoice.invoice_no} created for remaining amount: {negative_remaining_amount}"
+                )
+
+            return JsonResponse({
+                "status": "true",
+                "title": "Success",
+                "message": "Collection payment saved successfully.",
+                "redirect": "true",
+                "redirect_url": reverse("customers"),
+            })
+
+    except IntegrityError as e:
+        return JsonResponse({
+            "status": "false",
+            "title": "Database Error",
+            "message": str(e)
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "false",
+            "title": "Unexpected Error",
+            "message": str(e)
+        })

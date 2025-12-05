@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         date = datetime.datetime.today().date() - datetime.timedelta(days=1)
-        todays_customers = DialyCustomers.objects.filter(date=date)
+        todays_customers = DialyCustomers.objects.filter(is_guest=False, date=date)
         
         for customer in todays_customers:
             inactive_instance,create = InactiveCustomers.objects.get_or_create(

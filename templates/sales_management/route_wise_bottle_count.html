@@ -65,11 +65,11 @@
                                         <td style="text-align:left;">{{ data.route_name }}</td>
                                         <td style="text-align:left;">{% route_bottle_stock data.route_id "van_stock" %}</td>
                                         <td style="text-align:left;">{% route_bottle_stock data.route_id "total_bottle_count" %}</td>
-                                        {% comment %} <td style="text-align:left;">
+                                        <td style="text-align:left;">
                                             <a href="" class="btn btn-warning-light btn-sm" data-bs-toggle="tooltip" title="View">
                                                 <span class="bi bi-eye fs-14"></span>
                                             </a>
-                                        </td> {% endcomment %}
+                                        </td>
                                     </tr>
                                 {% endfor %}
                             </tbody>

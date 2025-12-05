@@ -15,7 +15,7 @@ from product.models import ProdutItemMaster
 from sales_management.models import CollectionPayment
 
 # Read the Excel file
-file_path = '/home/ra/Downloads/S L DATA (1) (3).xlsx'
+file_path = '/home/ra/Downloads/S-08 CUSTOMER ADD.xlsx'
 data = pd.read_excel(file_path)
 
 # Strip any leading/trailing whitespace from column names
@@ -38,10 +38,10 @@ def clean_value(value, default):
 
 @transaction.atomic
 def populate_models_from_excel(data):
-    user = CustomUser.objects.get(username="Moquait123")
-    route = RouteMaster.objects.get(route_name="SL")
+    user = CustomUser.objects.get(username="S-08")
+    route = RouteMaster.objects.get(route_name="S-08")
     emirate = EmirateMaster.objects.get(name="Dubai")
-    branch = BranchMaster.objects.get(name="office")
+    branch = BranchMaster.objects.get(name="Sana Water")
     # outstanding_in = CustomerOutstanding.objects.filter(customer__sales_staff=user,product_type='amount')
     # Invoice.objects.filter(customer__sales_staff=user).delete()
     # outstanding_in.delete()
@@ -62,8 +62,8 @@ def populate_models_from_excel(data):
         custody_count = Decimal(clean_value(row['custody_count'], 0))  # Handle NaN and convert to Decimal
         outstanding = Decimal(clean_value(row['outstanding'], 0))  # Handle NaN and convert to Decimal
         day_of_supply = clean_value(row['day_of_supply'], "")
-        custody_cooler_count = clean_value(row['custody_cooler_count'], 0)
-        custody_cooler_type = clean_value(row['custody_cooler_type'], 0)
+        
+        print(type(phone_no),phone_no)
         
         if sales_type.lower() == "cash":
             sales_type = "CASH"
@@ -82,16 +82,14 @@ def populate_models_from_excel(data):
             customer_type = "SHOP"
         
         # user_id = CustomUser.objects.none
-        if phone_no:
-            user_qs = CustomUser.objects.filter(username=phone_no)
-            if user_qs.exists():
-                user_id = user_qs.first()
+        if phone_no != "":
+            if not (user_id:=CustomUser.objects.filter(username=phone_no)).exists():
+                user_id = user_id.first()
             else:
                 user_id = CustomUser.objects.create(
                     username=phone_no,
-                    password=make_password(str(phone_no))
-                )
-
+                    password = make_password(str(phone_no))
+                    )
                 
         visit_schedule = {"Friday": [""], "Monday": [""], "Sunday": [""], "Tuesday": [], "Saturday": [], "Thursday": [], "Wednesday": []}
         if day_of_supply.lower() == "sunday":
@@ -112,6 +110,7 @@ def populate_models_from_excel(data):
         customer_instance = Customers.objects.create(
             created_by=1,
             created_date=datetime.today(),
+            
             custom_id=get_custom_id(Customers),
             customer_name=customer_name,
             building_name=building,
@@ -133,7 +132,7 @@ def populate_models_from_excel(data):
             rate=bottle_rate
         )
         
-        if phone_no != "" and not Customers.objects.filter(user_id=user_id).exists():
+        if phone_no != "":
             customer_instance.user_id=user_id
             customer_instance.save()
         
@@ -153,24 +152,6 @@ def populate_models_from_excel(data):
                 amount=0,
                 can_deposite_chrge=0,
                 five_gallon_water_charge=customer_instance.rate,
-            )
-        
-        if custody_cooler_count > 0:
-            custodu_custom = CustodyCustom.objects.create(
-                customer=customer_instance,
-                total_amount=0,
-                deposit_type="non_deposit",
-                amount_collected=0
-            )
-            
-            CustodyCustomItems.objects.create(
-                custody_custom=custodu_custom,
-                product=ProdutItemMaster.objects.get(product_name="Hot and Cool"),
-                quantity=custody_cooler_count,
-                serialnumber=0,
-                amount=0,
-                can_deposite_chrge=0,
-                five_gallon_water_charge=0,
             )
             
         if outstanding > 0:
@@ -212,7 +193,7 @@ def populate_models_from_excel(data):
             customer_outstanding.save()
             
             if outstanding_amount.customer_outstanding.customer.sales_type == "CREDIT":
-                invoice.invoice_type = "credit_invoive"
+                invoice.invoice_type = "credit_invoice"
                 invoice.save()
 
             # Create invoice items

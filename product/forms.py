@@ -26,9 +26,6 @@ class Product_Item_Create_Form(forms.ModelForm):
             'tax' : forms.Select(attrs={'class': 'form-control', 'required': 'true'}),
             'image': forms.FileInput(attrs={'class': 'form-control'}),
         }
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['category'].queryset = CategoryMaster.objects.filter(is_deleted=False)
 
 class Products_Edit_Form(forms.ModelForm):
     def __init__(self, *args, **kwargs):

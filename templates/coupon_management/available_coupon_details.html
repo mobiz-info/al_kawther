@@ -62,7 +62,7 @@
                                     <ul id="leaflet-list" class="d-flex">
                                         {% available_valuable_coupons  manual_coupon.coupon.pk as availabele_manual_valid %}
                                         {% for lis in availabele_manual_valid %}
-                                        <li class="generated_leaf_li {% if lis.used %}used_leaf{% endif %}" data-id="{{lis.pk}}">{{lis.leaflet_name}} <span style="display: block;">AED {{manual_coupon.get_avg_rate}}</span></li>
+                                        <li class="generated_leaf_li {% if lis.used %}used_leaf{% endif %}" data-id="{{lis.pk}}">{{lis.leaflet_name}}</li>
                                         {% endfor %}
                                     </ul>
                                     

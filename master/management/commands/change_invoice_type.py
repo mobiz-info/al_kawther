@@ -11,7 +11,7 @@ class Command(BaseCommand):
         
         for invoice in invoices:
             if invoice.customer.sales_type=="CREDIT":
-                invoice.invoice_type="credit_invoive"
+                invoice.invoice_type="credit_invoice"
                 invoice.save()
 
         self.stdout.write(self.style.SUCCESS('Successfully updated into credit invoice'))

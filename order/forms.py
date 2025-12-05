@@ -31,7 +31,7 @@ class Order_change_Form(forms.ModelForm):
         super().__init__(*args, **kwargs)
         print(route_id)
         self.fields['reason'].queryset = Change_Reason.objects.all()
-        self.fields['customer'].queryset = Customers.objects.filter(routes_id = route_id)
+        self.fields['customer'].queryset = Customers.objects.filter(is_guest=False, routes_id = route_id)
         self.fields['product'].queryset = Product.objects.all()
     
     def save(self, route, commit=True):
@@ -78,7 +78,7 @@ class Order_return_Form(forms.ModelForm):
         super().__init__(*args, **kwargs)
         print(route_id)
         self.fields['reason'].queryset = Change_Reason.objects.all()
-        self.fields['customer'].queryset = Customers.objects.filter(routes_id = route_id)
+        self.fields['customer'].queryset = Customers.objects.filter(is_guest=False, routes_id = route_id)
         self.fields['product'].queryset = Product.objects.all()
     
     def save(self, route, commit=True):

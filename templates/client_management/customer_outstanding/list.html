@@ -119,13 +119,13 @@
                                     <td>{{ customer.door_house_no }}</td>
                                     <td>{{ customer.routes.route_name }}</td>
                                     {% if filter_data.product_type == 'amount' %}
-                                    <td>{{ outstanding_amount }}</td>
+                                    <td>{{ customer.outstanding_amount }}</td>
                                     {% endif %}
                                     {% if filter_data.product_type == 'emptycan' %}
-                                    <td>{{ outstanding_bottles }}</td>
+                                    <td>{{ customer.outstanding_bottles }}</td>
                                     {% endif %}
                                     {% if filter_data.product_type == 'coupons' %}
-                                    <td>{{ outstanding_coupons }}</td>
+                                    <td>{{ customer.outstanding_coupons }}</td>
                                     {% endif %}
                                     <td class="text-center">
                                         <div class="g-2">

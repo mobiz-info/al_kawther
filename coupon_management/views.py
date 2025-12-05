@@ -1,6 +1,4 @@
-import random
-
-import string
+import re
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,8 +9,6 @@ from lxml.etree import HTML
 from openpyxl import Workbook
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate
-from django.db import transaction, IntegrityError
-from decimal import Decimal
 
 from client_management.models import *
 from competitor_analysis.forms import CompetitorAnalysisFilterForm
@@ -21,9 +17,8 @@ from product.models import Staff_Orders_details
 from . models import *
 from .forms import  *
 from accounts.models import CustomUser, Customers
-from invoice_management.models import Invoice,InvoiceDailyCollection
+from invoice_management.models import Invoice
 from sales_management.models import *
-from van_management.models import VanCouponStock,Van_Routes
 from master.models import EmirateMaster, BranchMaster, RouteMaster
 import json
 from django.core.serializers import serialize
@@ -56,28 +51,11 @@ from master.functions import log_activity
 #         alphabetic_list.insert(0, "A")
 
 #     return "".join(alphabetic_list)
-from dal import autocomplete
 
 import re
 from django.http import JsonResponse
 from .models import CouponType, NewCoupon, CouponLeaflet, FreeLeaflet
 
-
-class CouponAutocomplete(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = NewCoupon.objects.all() 
-
-        if self.q:
-            qs = qs.filter(
-                Q(book_num__icontains=self.q) |
-                Q(coupon_type_coupon_type_name_icontains=self.q) |
-                Q(leaflets_leaflet_number_icontains=self.q) |
-                Q(leaflets_leaflet_name_icontains=self.q) |
-                Q(freeleaflet_leaflet_number_icontains=self.q) |
-                Q(freeleaflet_leaflet_name_icontains=self.q)
-            ).distinct()
-
-        return qs
 
 def get_next_coupon_bookno(request):
     coupon_type = request.GET.get("coupon_type")
@@ -86,38 +64,34 @@ def get_next_coupon_bookno(request):
     end_leaf_no = ""
     next_free_leaf_no = ""
     end_free_leaf_no = ""
-    starting_letter = ""          # <-- new for book prefix
-    leaf_starting_letter = ""     # <-- new for leaflet prefix
-    free_leaf_starting_letter = "" # <-- new for free leaflet prefix
 
-    # Fetch free leaflets count for the coupon type
-    coupon_type_freeleaf_count = get_object_or_404(CouponType, pk=coupon_type).free_leaflets
+    # Fetch free leaflets for the coupon type
+    coupon_type_freeleaf_count = CouponType.objects.get(pk=coupon_type).free_leaflets
 
     # Retrieve the last coupon of the selected type
-    last_coupon_qs = NewCoupon.objects.filter(coupon_type__pk=coupon_type)
-    if last_coupon_qs.exists():
-        last_coupon = last_coupon_qs.latest("created_date")
+    last_coupon = NewCoupon.objects.filter(coupon_type__pk=coupon_type)
+    if last_coupon.exists():
+        last_coupon = last_coupon.latest("created_date")
         last_coupon_bookno = last_coupon.book_num
 
         # Match and separate alphabetic and numeric parts of the book number
         match = re.match(r"([a-zA-Z]*)(\d+)", last_coupon_bookno)
         if match:
             alphabetic_part, numeric_part = match.groups()
-            starting_letter = alphabetic_part   # <-- store book prefix
             next_numeric_part = str(int(numeric_part) + 1).zfill(len(numeric_part))
             next_coupon_bookno = f"{alphabetic_part}{next_numeric_part}"
         else:
+            # Fallback for purely numeric book numbers
             next_coupon_bookno = str(int(last_coupon_bookno) + 1)
 
         # Handle leaflet numbers
-        leaflet_qs = CouponLeaflet.objects.filter(coupon=last_coupon)
-        if leaflet_qs.exists():
-            last_leaf_number = leaflet_qs.latest("created_date").leaflet_name
+        if (leaflet := CouponLeaflet.objects.filter(coupon=last_coupon)).exists():
+            last_leaf_number = leaflet.latest("created_date").leaflet_name
+
             if last_leaf_number:
                 match = re.match(r"([a-zA-Z]*)(\d+)", last_leaf_number)
                 if match:
                     leaf_alphabetic_part, leaf_name_part = match.groups()
-                    leaf_starting_letter = leaf_alphabetic_part  # <-- store leaflet prefix
                     next_leaf_number = str(int(leaf_name_part) + 1).zfill(len(leaf_name_part))
                     end_leaf_number = str(int(next_leaf_number) + int(last_coupon.valuable_leaflets) - 1).zfill(len(leaf_name_part))
                     next_leaf_no = f"{leaf_alphabetic_part}{next_leaf_number}"
@@ -131,16 +105,18 @@ def get_next_coupon_bookno(request):
                     except ValueError:
                         next_leaf_no = "1"
                         end_leaf_no = str(int(next_leaf_no) + int(last_coupon.valuable_leaflets) - 1)
+            else:
+                next_leaf_no = "1"
+                end_leaf_no = str(int(next_leaf_no) + int(last_coupon.valuable_leaflets) - 1)
 
         # Handle free leaflet numbers
-        free_leaflet_qs = FreeLeaflet.objects.filter(coupon=last_coupon)
-        if free_leaflet_qs.exists():
-            last_free_leaf_number = free_leaflet_qs.latest("created_date").leaflet_name
+        if (free_leaflet := FreeLeaflet.objects.filter(coupon=last_coupon)).exists():
+            last_free_leaf_number = free_leaflet.latest("created_date").leaflet_name
+
             if last_free_leaf_number:
                 match = re.match(r"([a-zA-Z]*)(\d+)", last_free_leaf_number)
                 if match:
                     free_leaf_alphabetic_part, free_leaf_name_part = match.groups()
-                    free_leaf_starting_letter = free_leaf_alphabetic_part  # <-- store free leaflet prefix
                     next_free_leaf_number = str(int(free_leaf_name_part) + 1).zfill(len(free_leaf_name_part))
                     end_free_leaf_number = str(int(next_free_leaf_number) + int(coupon_type_freeleaf_count) - 1).zfill(len(free_leaf_name_part))
                     next_free_leaf_no = f"{free_leaf_alphabetic_part}{next_free_leaf_number}"
@@ -154,17 +130,17 @@ def get_next_coupon_bookno(request):
                     except ValueError:
                         next_free_leaf_no = "1"
                         end_free_leaf_no = str(int(next_free_leaf_no) + int(coupon_type_freeleaf_count) - 1)
+            else:
+                next_free_leaf_no = "1"
+                end_free_leaf_no = str(int(next_free_leaf_no) + int(coupon_type_freeleaf_count) - 1)
 
     data = {
-        "next_coupon_bookno": next_coupon_bookno,
-        "starting_letter": starting_letter,  # <-- book prefix
+        'next_coupon_bookno': next_coupon_bookno,
         "next_leaf_no": next_leaf_no,
         "end_leaf_no": end_leaf_no,
-        "leaf_starting_letter": leaf_starting_letter,  # <-- leaflet prefix
         "next_free_leaf_no": next_free_leaf_no,
         "end_free_leaf_no": end_free_leaf_no,
-        "free_leaf_starting_letter": free_leaf_starting_letter,  # <-- free leaflet prefix
-        "coupon_type_freeleaf_count": coupon_type_freeleaf_count,
+        "coupon_type_freeleaf_count": coupon_type_freeleaf_count
     }
     return JsonResponse(data, safe=False)
 
@@ -197,7 +173,7 @@ def get_leaf_used_status_change(request):
         stock.save()
         
     elif (free_coupon:=FreeLeaflet.objects.filter(pk=leaf_id)).exists():
-        stock = FreeLeaflet.objects.get(customer__pk=customer_id,coupon_type_id=free_coupon.first().coupon.coupon_type)
+        stock = CustomerCouponStock.objects.get(customer__pk=customer_id,coupon_type_id=free_coupon.first().coupon.coupon_type)
         
         if not free_coupon.first().used :
             free_coupon.update(used=True)
@@ -307,15 +283,12 @@ def new_coupon(request):
     filter_data = {}
     
     query = request.GET.get("q")
-    designation = request.GET.get("designation", "")
     status_type = "company"
     
     if request.GET.get('status_type'):
         status_type = request.GET.get('status_type')
-        
     
     filter_data['status_type'] = status_type
-    filter_data["designation"] = designation
     
     coupon_ids = CouponStock.objects.filter(coupon_stock=status_type).values_list("couponbook__pk")
     instances = NewCoupon.objects.filter(pk__in=coupon_ids).order_by("-created_date")
@@ -329,27 +302,9 @@ def new_coupon(request):
         title = "Coupon List - %s" % query
         filter_data['q'] = query
     
-    if designation:
-        if status_type == "customer":
-            customer_ids = CustomerCouponItems.objects.filter(
-                customer_coupon__customer__customer_name__icontains=designation
-            ).values_list("coupon__pk", flat=True)
-            instances = instances.filter(pk__in=customer_ids)
-        elif status_type == "van":
-
-            van_ids = VanCouponStock.objects.filter(
-                van__in=Van_Routes.objects.filter(
-                    routes__route_name__icontains=designation
-                ).values_list("van_id", flat=True)
-            ).values_list("coupon__pk", flat=True)
-            instances = instances.filter(pk__in=van_ids)
-        elif status_type == "company":
-            instances = instances.filter(branch_id__name__icontains=designation)
-    routes = Van_Routes.objects.all()
     context = {
         'instances': instances,
-        'filter_data': filter_data,
-        "routes": routes,
+        'filter_data': filter_data
         }
     
     return render(request, 'coupon_management/index_Newcoupon.html', context)
@@ -445,20 +400,11 @@ def generate_leaflets(request, coupon_id):
     coupon = get_object_or_404(NewCoupon, coupon_id=coupon_id)
     leaflets = []
     no_of_leaflets = int(coupon.coupon_type.no_of_leaflets)
-
-    # Pick a random uppercase letter for this batch
-    prefix = random.choice(string.ascii_uppercase)  
-
     for leaflet_num in range(1, no_of_leaflets + 1):
-        leaflet_code = f"{prefix}{str(leaflet_num).zfill(3)}"  
-        # Example: A001, A002, A003
-
-        leaflet = CouponLeaflet(
-            coupon=coupon,
-            leaflet_number=leaflet_code
-        )
+        leaflet = CouponLeaflet(coupon=coupon, leaflet_number=str(leaflet_num))
         leaflets.append(leaflet)
         leaflet.save()
+        
 
     context = {'coupon': coupon, 'leaflets': leaflets}
     return render(request, 'coupon_management/create_Newcoupon.html', context)
@@ -870,8 +816,7 @@ def coupon_recharge_list(request):
     query = request.GET.get("q")
     payment_type = request.GET.get('payment_type', '')
     coupon_method = request.GET.get('coupon_method', '')
-    route = request.GET.get('route', '')
-    
+
     coupon_customer = CustomerCoupon.objects.all().order_by('-created_date')
     
     if start_date and end_date:
@@ -879,7 +824,6 @@ def coupon_recharge_list(request):
         filter_data['end_date'] = start_date
         # If both dates are provided, filter between them
         coupon_customer = coupon_customer.filter(created_date__range=(start_date, end_date))
-    
     if query:
         coupon_customer = coupon_customer.filter(
             Q(customer__custom_id__icontains=query) |
@@ -890,29 +834,21 @@ def coupon_recharge_list(request):
             Q(customercouponitems__coupon__book_num__icontains=query)
         )
         filter_data['q'] = query
-    
     # Apply payment_type and coupon_method filters
     if payment_type:
         coupon_customer = coupon_customer.filter(payment_type=payment_type)
         filter_data['payment_type'] = payment_type
-    
     if coupon_method:
         coupon_customer = coupon_customer.filter(coupon_method=coupon_method)
         filter_data['coupon_method'] = coupon_method
-        
-    if route:
-        coupon_customer = coupon_customer.filter(customer__routes__pk=route)
-        filter_data['route'] = route
-        
+
     log_activity(
             created_by=request.user,
             description=f"Viewed coupon recharge list."
         )
-    
     context={
         'coupon_customer':coupon_customer,
         'filter_data': filter_data,
-        'route_instances': RouteMaster.objects.all(),
     }
 
     return render(request,'coupon_management/coupon_recharge_list.html', context)
@@ -1046,134 +982,3 @@ def delete_coupon_recharge(request, pk):
     except Exception as e:
         messages.error(request, f"Error during rollback: {str(e)}")
         return redirect("coupon_recharge")
-    
-    
-  
-def un_issued_coupon_book_list(request):
-    filter_data = {}
-    query = request.GET.get("q")
-    coupon_method = request.GET.get('coupon_method', '')
-
-    customer_coupon_item_coupon_ids = CustomerCouponItems.objects.all().values_list("coupon__pk")
-    coupon_stock = CouponStock.objects.filter(coupon_stock="customer").exclude(couponbook__pk__in=customer_coupon_item_coupon_ids)
-    instances = NewCoupon.objects.filter(pk__in=coupon_stock.values_list("couponbook__pk")).order_by("-created_date")
-    
-    if query:
-
-        instances = instances.filter(
-            Q(book_num__icontains=query) |
-            Q(coupon_type__coupon_type_name__icontains=query)
-        )
-        title = "Coupon List - %s" % query
-        filter_data['q'] = query
-    
-    if coupon_method:
-        coupon_stock = coupon_stock.filter(coupon_method=coupon_method)
-        filter_data['coupon_method'] = coupon_method
-
-    log_activity(
-            created_by=request.user,
-            description=f"Viewed un issued list."
-        )
-    context={
-        'instances':instances,
-        'filter_data': filter_data,
-    }
-
-    return render(request,'coupon_management/un_issued_couon_book_list.html', context)
-
-
-@login_required
-def reassign_unissued_coupon(request, pk):
-    if request.method == "POST":
-        form = CouponReassignForm(request.POST)
-        if form.is_valid():
-            try:
-                with transaction.atomic():
-                    customer = form.cleaned_data["customer"]
-                    salesman = form.cleaned_data["salesman"] or request.user
-                    coupon = form.cleaned_data["coupon"]
-
-                    customer_coupon = CustomerCoupon.objects.create(
-                        customer=customer,
-                        salesman=salesman,
-                        created_date=datetime.now(),
-                        coupon_method="manual",
-                        net_amount=0,
-                        discount=0,
-                        total_payeble=0,
-                        amount_recieved=0,
-                    )
-
-                    coupon_item = CustomerCouponItems.objects.create(
-                        customer_coupon=customer_coupon,
-                        coupon=coupon,
-                        rate=0
-                    )
-                    
-                    try:
-                        customer_coupon_stock = CustomerCouponStock.objects.get(
-                            coupon_method=customer_coupon.coupon_method,
-                            customer=customer_coupon.customer,
-                            coupon_type_id=coupon_item.coupon.coupon_type
-                        )
-                    except CustomerCouponStock.DoesNotExist:
-                        customer_coupon_stock = CustomerCouponStock.objects.create(
-                            coupon_method=customer_coupon.coupon_method,
-                            customer=customer_coupon.customer,
-                            coupon_type_id=coupon_item.coupon.coupon_type,
-                            count=0
-                        )
-                        
-                    leaf_count = CouponLeaflet.objects.filter(coupon=coupon_item.coupon, used=False).count()
-                    leaf_count += FreeLeaflet.objects.filter(coupon=coupon_item.coupon, used=False).count()
-
-                    customer_coupon_stock.count += Decimal(leaf_count)
-                    customer_coupon_stock.save()
-
-                    log_activity(
-                        created_by=request.user,
-                        description=f"Re-assigned coupon {coupon.book_num} to {customer.customer_name}"
-                    )
-
-                    response_data = {
-                        "status": "true",
-                        "title": "Successfully Assigned",
-                        "message": "Coupon Assigned successfully.",
-                        "redirect": "true",
-                        "redirect_url": reverse("un_issued_coupon_book_list"),
-                    }
-                    return HttpResponse(json.dumps(response_data), content_type="application/json")
-
-            except IntegrityError as e:
-                response_data = {
-                    "status": "false",
-                    "title": "Failed",
-                    "message": f"Integrity error: {str(e)}",
-                }
-                return HttpResponse(json.dumps(response_data), content_type="application/json")
-
-            except Exception as e:
-                response_data = {
-                    "status": "false",
-                    "title": "Error",
-                    "message": str(e),
-                }
-                return HttpResponse(json.dumps(response_data), content_type="application/json")
-
-        else:
-            response_data = {
-                "status": "false",
-                "title": "Validation Failed",
-                "message": generate_form_errors(form, formset=False),
-            }
-            return HttpResponse(json.dumps(response_data), content_type="application/json")
-
-    else:
-        coupon = NewCoupon.objects.get(pk=pk)
-        form = CouponReassignForm(initial={"coupon": coupon})
-        # Ensure the coupon is in queryset
-        form.fields["coupon"].queryset = NewCoupon.objects.filter(pk=pk) | form.fields["coupon"].queryset
-
-    return render(request, "coupon_management/reassign_coupon.html", {"form": form, "is_need_autocomplete": True})
-

@@ -6,7 +6,7 @@ class Command(BaseCommand):
     help = 'Add custom ID for each customer based on created date'
 
     def handle(self, *args, **kwargs):
-        customers = Customers.objects.filter(visit_schedule="Monday ")
+        customers = Customers.objects.filter(is_guest=False, visit_schedule="Monday ")
         
         # Update visit_schedule for each customer
         for customer in customers:

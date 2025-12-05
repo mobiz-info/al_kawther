@@ -31,7 +31,6 @@
                             <a onclick="printDiv('printArea'); return false;" class="btn btn-outline-success me-2" style="width: 7em;"><i class="fas fa-print"></i> Print</a>
                             <a onclick="document.getElementById('qr_print_form').submit(); return false;" class="btn btn-outline-primary me-2" style="width: 10em;"><i class="fas fa-print"></i> Print QR Code</a>
                             <a href="{% url 'customer_create' %}" class="btn btn-success btn-wave"><i class="bi bi-plus-circle me-1"></i> Create</a>
-                            <a href="{% url 'cancelled_customers' %}" class="btn btn-danger btn-wave"><i class="bi bi-person-x me-1"></i> View Cancelled Customers</a>
                         </div>
                     </div>
                     <div class="card-body">
@@ -59,6 +58,19 @@
                                             </option>
                                         {% endfor %}
                                     </select>
+                                    <select name="location" class="form-select">
+                                        <option value="">All Locations</option>
+                                        {% for location in locations %}
+                                            <option value="{{ location.location_id }}" {% if filter_data.location == location.location_id|stringformat:"s" %}selected{% endif %}>
+                                                {{ location.location_name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                    <select name="status" class="form-control">
+                                        <option value="">-- Select Status --</option>
+                                        <option value="active" {% if filter_data.status == 'active' %}selected{% endif %}>Active</option>
+                                        <option value="inactive" {% if filter_data.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                    </select>
                                     <input type="date" name="created_date" class="form-control" value="{{ filter_data.created_date }}">
                                     <input type="text" name="q" class="form-control" placeholder="Search ..." value="{{ filter_data.q }}">
                                     <button type="submit" class="btn btn-primary"><i class="bi bi-search"></i>Search</button>
@@ -72,25 +84,24 @@
                                 <table class="table table-bordered text-nowrap">
                                     <thead>
                                         <tr>
-                                            <th style="text-align:center !important;width:5%;" scope="col"><input type="checkbox" id="select_all" onclick="toggleAll(this)"> Sl.No</th>
+                                        <th style="text-align:center !important;width:5%;" scope="col"><input type="checkbox" id="select_all" onclick="toggleAll(this)"> Sl.No</th>
                                         <th style="text-align:center !important;" scope="col">Created Date</th>
                                         <th style="text-align:center !important;" scope="col">Customer ID</th>
                                         <th style="text-align:center !important;" scope="col">Customer Name</th>
                                         <th style="text-align:center !important;" scope="col">Route</th>
                                         <th style="text-align:center !important;" scope="col">Location</th>
                                         <th style="text-align:center !important;" scope="col">Mobile No</th>
+                                        <th style="text-align:center !important;" scope="col">Whatsapp No</th>
                                         <th style="text-align:center !important;" scope="col">Building Name/<br>House No</th>
                                         <th style="text-align:center !important;" scope="col">Next Visit <br>Date</th>
                                         <th style="text-align:center !important;" scope="col">Bottle Stock</th>
-                                        <th style="text-align:center !important;" scope="col">Dispenser</th>
-                                        <th style="text-align:center !important;" scope="col">Hot & Cool</th>
                                         <th style="text-align:center !important;" scope="col">Sales Type</th>
                                         <th style="text-align:center !important;" scope="col">Rate</th>
                                         <th style="text-align:center !important;" scope="col">Actions</th>
                                     </tr>
                                     </thead>
                                     <tbody>
-
+                                        
                                         {% load el_pagination_tags %}
                                         {% paginate 50 user_li %}
                                         {% for data in user_li %}
@@ -104,15 +115,15 @@
                                             <td style="text-align:left;">{{data.routes.route_name}}</td>
                                             <td style="text-align:left;">{{data.location.location_name}}</td>
                                             <td style="text-align:left;">{{data.mobile_no}}</td>
+                                            <td style="text-align:left;">{{data.whats_app}}</td>
                                             <td style="text-align:left;">{{data.building_name}},<br> {{data.door_house_no}}</td>
                                             {% get_next_visit_day data.pk as next_visit_date %}
                                             <td style="text-align:left;">{{next_visit_date}}</td>
-                                            <td style="text-align:left;">{% bottle_stock data.pk %}</td>
-                                            <td style="text-align:left;">{% dispenser_stock data.pk %}</td>
-                                            <td style="text-align:left;">{% hot_cool_stock data.pk %}</td>
-
+                                            {% bottle_stock data.pk as total_bottle_count %}
+                                            <td style="text-align:left;">{{total_bottle_count}}</td>
                                             <td style="text-align:left;">{{data.sales_type}}</td>
                                             <td style="text-align:right;">{{data.rate}}</td>
+                                        
                                             <td style="text-align:center;">
                                                 <div class="g-2">
                                                     <a href="{% url 'customer_details' data.customer_id %}" aria-label="anchor" class="btn btn-warning-light btn-sm" data-bs-toggle="tooltip" data-bs-original-title="View">
@@ -133,6 +144,11 @@
                                                     <a href="{% url 'customer_outstanding_details' data.customer_id %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Outstanding">
                                                         <span class="bi bi-cash-coin fs-14"></span> <!-- Icon updated for 'Outstanding' -->
                                                     </a>
+                                                    <a href="{% url 'collection' data.customer_id %}" aria-label="anchor" 
+                                                        class="btn btn-info-light btn-sm ms-2" data-bs-toggle="tooltip" 
+                                                        data-bs-original-title="Collection">
+                                                            <span class="bi bi-wallet2 fs-14"></span>
+                                                    </a>
                                                     <a href="{% url 'customer_transaction_list' %}?customer_pk={{ data.customer_id }}" aria-label="anchor" class="btn btn-success btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Customer Transaction">
                                                         <span class="bi bi-receipt fs-14"></span> <!-- Icon updated for 'Customer Transaction' -->
                                                     </a>
@@ -141,9 +157,6 @@
                                                     </a>
                                                     <a href="{% url 'coupon_count_list' data.customer_id %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Coupons">
                                                         <span class="bi bi-ticket-detailed fs-14"></span> <!-- Icon updated for 'Coupons' -->
-                                                    </a>
-                                                    <a href="{% url 'add_cancel_reason' data.customer_id %}" aria-label="anchor" class="btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Cancellation Reason">
-                                                        <span class="bi bi-x-circle fs-14"></span> <!-- Icon for 'Cancelled Reasons' -->
                                                     </a>
                                                         <!-- Username Change -->
                                                     <a href="{% url 'customer_username_change' data.customer_id %}" aria-label="anchor"
@@ -170,7 +183,7 @@
                                                 </div>
                                             </td>
                                         </tr>
-                                        {% endfor %}
+                                    {%endfor%}
                                     </tbody>
                                 </table>
                             </form>

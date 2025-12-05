@@ -29,7 +29,7 @@ def get_route_name(staff_id):
 @register.simple_tag
 def get_categories():
     try:
-        return CategoryMaster.objects.filter(is_deleted=False)
+        return CategoryMaster.objects.all()
     except :
         return "--"
     

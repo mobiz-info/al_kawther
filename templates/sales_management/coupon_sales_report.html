@@ -45,7 +45,7 @@
                                 <select name="sales_type" class="form-select">
                                     <option value="">All Sales Types</option>
                                     <option value="CASH COUPON" {% if filter_data.sales_type == 'CASH COUPON' %}selected{% endif %}>CASH COUPON</option>
-                                    <option value="FOC" {% if filter_data.sales_type == 'FOC' %}selected{% endif %}>FOC</option>
+                                    {% comment %} <option value="FOC" {% if filter_data.sales_type == 'FOC' %}selected{% endif %}>FOC</option> {% endcomment %}
                                     <option value="CASH" {% if filter_data.sales_type == 'CASH' %}selected{% endif %}>CASH</option>
                                     <option value="CREDIT" {% if filter_data.sales_type == 'CREDIT' %}selected{% endif %}>CREDIT</option>
                                 </select>
@@ -76,7 +76,6 @@
                     <thead>
                         <tr>
                             <th>Sl No</th>
-                            <th>Date</th>
                             <th>Coupon Method</th>
                             <th>Book Number</th>
                             <th>Customer Name</th>
@@ -98,7 +97,6 @@
                         {% for sale in coupon_sales %}
                             <tr>
                                 <td>{{ forloop.counter }}</td>
-                                <td>{{ sale.customer_coupon.created_date|date }}</td>
                                 <td>{{ sale.customer_coupon.coupon_method }}</td>
                                 <td>{{ sale.coupon.book_num }}</td>
                                 <td>{{ sale.customer_coupon.customer.customer_name }}</td>
@@ -109,7 +107,7 @@
                                 <td>{{ sale|used_coupon_count }}</td>
                                 <td>{{ sale|unused_coupon_count }}</td>
                                 <td>{{ sale.rate }}</td>
-                                <td>{{ sale.get_avg_rate|default:0|floatformat:2 }}</td>
+                                <td>{{ sale|per_leaf_rate }}</td>
                                 <td>{{ sale.customer_coupon.amount_recieved }}</td>
                                 <td>{{ sale.customer_coupon.balance }}</td>
                             </tr>

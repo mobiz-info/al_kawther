@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from django.db import models
 
@@ -29,6 +30,9 @@ class CreditNote(models.Model):
         return f'{self.id}'
     
     def save(self, *args, **kwargs):
+        if not self.created_date:
+            self.created_date = datetime.datetime.today().now(),
+            
         if not self.credit_note_no:
             year = self.created_date.strftime("%y")
             prefix = f"CN-{year}/"
@@ -43,7 +47,6 @@ class CreditNote(models.Model):
             self.credit_note_no = f"{prefix}{new_number}"
 
         super().save(*args, **kwargs)
-
     
     def credit_note_items (self):
         items = CreditNoteItems.objects.filter(credit_note=self)
