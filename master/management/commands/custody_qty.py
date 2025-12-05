@@ -12,7 +12,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         # Fetch DM route customers
-        dm_customers = Customers.objects.filter(routes__route_name="SL", is_deleted=False, is_cancelled=False)
+        dm_customers = Customers.objects.filter(routes__route_name="SL", is_deleted=False)
 
         updated_count = 0
 

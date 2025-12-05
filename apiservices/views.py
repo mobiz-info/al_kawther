@@ -901,7 +901,7 @@ def find_customers(request, def_date, route_id):
     
     todays_customers = []
     buildings = []
-    for customer in Customers.objects.filter(routes=route,is_calling_customer=False,is_deleted=False,is_cancelled=False).exclude(pk__in=vocation_customer_ids):
+    for customer in Customers.objects.filter(routes=route,is_calling_customer=False,is_deleted=False).exclude(pk__in=vocation_customer_ids):
         if customer.visit_schedule:
             for day, weeks in customer.visit_schedule.items():
                 if day in str(day_of_week) and week_number in str(weeks):
@@ -1582,7 +1582,7 @@ class Customer_API(APIView):
                     description=f"Fetched details for customer  {queryset.customer_name}"
                 )
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            queryset = Customers.objects.filter(is_deleted=False,is_cancelled=False)
+            queryset = Customers.objects.filter(is_deleted=False)
             serializer = CustomersSerializers(queryset, many=True)
             log_activity(
                 created_by=request.user.id,
@@ -3173,7 +3173,7 @@ class Myclient_API(APIView):
 
                         routes_list = RouteMaster.objects.filter(route_id__in=assign_routes).values_list('route_id', flat=True)
 
-                        customer_list = Customers.objects.filter(routes__pk__in=routes_list,is_deleted=False,is_cancelled=False)
+                        customer_list = Customers.objects.filter(routes__pk__in=routes_list,is_deleted=False)
                         serializer = self.serializer_class(customer_list, many=True)
                         
                         log_activity(staff.id, f"Fetched {len(customer_list)} customers for staff {userid}")
@@ -3190,7 +3190,7 @@ class Myclient_API(APIView):
             elif route_id and not userid:
                 try:
                     print(f"Received route_id: {route_id}")  # Debugging
-                    customer_list = Customers.objects.filter(routes__route_id=route_id, is_deleted=False,is_cancelled=False)
+                    customer_list = Customers.objects.filter(routes__route_id=route_id, is_deleted=False)
                     print(f"Found {len(customer_list)} customers")  # Debugging
                     serializer = self.serializer_class(customer_list, many=True)
                     log_activity(request.user, f"Fetched {len(customer_list)} customers for route {route_id}")
@@ -3209,7 +3209,7 @@ class Myclient_API(APIView):
                         # Check if the route is valid for the van
                         assign_routes = Van_Routes.objects.filter(van=vans).values_list('routes', flat=True)
                         if route_id in assign_routes:
-                            customer_list = Customers.objects.filter(routes__pk=route_id,is_deleted=False,is_cancelled=False)
+                            customer_list = Customers.objects.filter(routes__pk=route_id,is_deleted=False)
                             serializer = self.serializer_class(customer_list, many=True)
                             return Response(serializer.data)
                         else:

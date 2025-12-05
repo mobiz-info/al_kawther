@@ -450,7 +450,7 @@ def get_van_sales_office_report_summary(date, van, product):
     
     # *************************************** #
     # Custody Issue 
-    customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date, customer__routes__route_name=van.get_van_route, customer__is_deleted=False, customer__is_cancelled=False, sales_type__isnull=False)
+    customer_custody_instances = CustodyCustom.objects.filter(created_date__date=date, customer__routes__route_name=van.get_van_route, customer__is_deleted=False,  sales_type__isnull=False)
     fgallon_custody_instances = customer_custody_instances.filter(custodycustomitems__product__product_name="5 Gallon")
     
     cash_sale_qty += fgallon_custody_instances.filter(sales_type="CASH").aggregate(total_quantity=Sum('custodycustomitems__quantity'))['total_quantity'] or 0

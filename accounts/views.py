@@ -364,7 +364,7 @@ class Customer_List(View):
         created_date_filter = request.GET.get('created_date')
 
         # Start with all customers
-        user_li = Customers.objects.filter(is_deleted=False,is_cancelled=False).select_related('location', 'routes')
+        user_li = Customers.objects.filter(is_deleted=False).select_related('location', 'routes')
 
         # Apply filters
         if query:
@@ -530,7 +530,7 @@ class Latest_Customer_List(View):
         customer_type_filter = request.GET.get('customer_type')
 
         ten_days_ago = datetime.now() - timedelta(days=10)
-        user_li = Customers.objects.filter(created_date__gte=ten_days_ago,is_deleted=False,is_cancelled=False)
+        user_li = Customers.objects.filter(created_date__gte=ten_days_ago,is_deleted=False)
         
         if request.GET.get('start_date'):
             start_date = request.GET.get('start_date')
@@ -617,7 +617,7 @@ class Inactive_Customer_List(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
 
-                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False,is_cancelled=False)
+                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False)
                 
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
                 todays_customer_ids = {customer['customer_id'] for customer in todays_customers}
@@ -721,7 +721,7 @@ class PrintInactiveCustomerList(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
                 
-                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False,is_cancelled=False)
+                route_customers = Customers.objects.filter(routes=van_route.routes,is_deleted=False)
                 
                 # Ensure `todays_customers` is an empty list if `find_customers` returns None
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
@@ -932,7 +932,7 @@ class Customer_Details(View):
 
 def edit_customer(request,pk):
     branch = request.user.branch_id
-    cust_Data = Customers.objects.get(customer_id = pk,is_deleted=False,is_cancelled=False)
+    cust_Data = Customers.objects.get(customer_id = pk,is_deleted=False)
     form = CustomerEditForm(branch,instance = cust_Data)
     template_name = 'accounts/edit_customer.html'
     context = {"form":form}
@@ -1037,7 +1037,7 @@ from accounts.templatetags.accounts_templatetags import get_next_visit_day
 def customer_list_excel(request):
     query = request.GET.get("q")
     route_filter = request.GET.get('route_name')
-    user_li = Customers.objects.all().filter(is_deleted=False,is_cancelled=False)
+    user_li = Customers.objects.all().filter(is_deleted=False)
 
     # Apply filters if they exist
     if query and query != '' and query != 'None':
@@ -1409,8 +1409,8 @@ def add_cancel_reason(request, customer_id):
             cancel_reason.customer = customer
             cancel_reason.save()
 
-            customer.is_cancelled = True
-            customer.save(update_fields=['is_cancelled'])
+            # customer.is_cancelled = True
+            customer.save()
 
             return redirect('customers')
 
@@ -1885,7 +1885,7 @@ def gps_lock_view(request, route_id):
     return render(request, "accounts/gps_log_view.html", context)
 
 def cancelled_customers_list(request):
-    cancelled_customers = CustomerIscancelledReasons.objects.filter(customer__is_cancelled=True).order_by('-created_date')
+    cancelled_customers = CustomerIscancelledReasons.objects.filter().order_by('-created_date')
     return render(request, 'accounts/cancelled_customers_list.html', {'cancelled_customers': cancelled_customers})
 
 def undo_cancel_customer_confirm(request, customer_id):
@@ -1895,7 +1895,7 @@ def undo_cancel_customer_confirm(request, customer_id):
 def undo_cancel_customer(request, customer_id):
     if request.method == "POST":
         customer = get_object_or_404(Customers, customer_id=customer_id)
-        customer.is_cancelled = False
+        # customer.is_cancelled = False
         customer.save() 
         return redirect("cancelled_customers")
     

@@ -135,7 +135,7 @@ class CustodyCustom(models.Model):
             customer_outstanding__created_date__date=self.created_date.date(),
             customer_outstanding__invoice_no=self.invoice_no,
             customer_outstanding__customer__is_deleted = False,
-            customer_outstanding__customer__is_cancelled = False
+            # customer_outstanding__customer__is_cancelled = False
             
             ).exclude(coupon_type__coupon_type_name="Digital").aggregate(total_count=Sum('count'))['total_count'] or 0
 
@@ -145,7 +145,7 @@ class CustodyCustom(models.Model):
             customer_outstanding__created_date__date=self.created_date.date(),
             customer_outstanding__invoice_no=self.invoice_no,
             customer_outstanding__customer__is_deleted = False,
-            customer_outstanding__customer__is_cancelled = False,
+            # customer_outstanding__customer__is_cancelled = False,
             coupon_type__coupon_type_name="Digital"
             ).aggregate(total_count=Sum('count'))['total_count'] or 0
     
@@ -529,7 +529,7 @@ class CustomerOutstanding(models.Model):
         return str(self.product_type)
     
     def get_outstanding_count(self):
-        if self.customer and (not self.customer.is_deleted and not self.customer.is_cancelled):
+        if self.customer and (not self.customer.is_deleted ):
             if self.product_type == 'amount':
                 return OutstandingAmount.objects.filter(customer_outstanding=self).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
             if self.product_type == 'coupons':
@@ -647,7 +647,7 @@ class CustomerSupply(models.Model):
             customer_outstanding__created_date__date=self.created_date.date(),
             customer_outstanding__invoice_no=self.invoice_no,
             customer_outstanding__customer__is_deleted = False,
-            customer_outstanding__customer__is_cancelled = False
+            # customer_outstanding__customer__is_cancelled = False
             
             ).exclude(coupon_type__coupon_type_name="Digital").aggregate(total_count=Sum('count'))['total_count'] or 0
 
@@ -657,7 +657,7 @@ class CustomerSupply(models.Model):
             customer_outstanding__created_date__date=self.created_date.date(),
             customer_outstanding__invoice_no=self.invoice_no,
             customer_outstanding__customer__is_deleted = False,
-            customer_outstanding__customer__is_cancelled = False,
+            # customer_outstanding__customer__is_cancelled = False,
             coupon_type__coupon_type_name="Digital"
             ).aggregate(total_count=Sum('count'))['total_count'] or 0
     
