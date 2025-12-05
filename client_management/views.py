@@ -2820,200 +2820,200 @@ def customer_outstanding_list(request):
 #     return render(request, 'client_management/customer_outstanding/list.html', context)
 
 
-def export_to_excel(instances, date, total_amount, total_bottles, total_coupons):
-    """
-    Generate correct Excel for Customer Outstanding List
-    using Invoice model for amount outstanding.
-    """
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Customer Outstanding List"
-
-    # Header row
-    headers = [
-        "Sl No", "Customer ID", "Customer Name", "Building No",
-        "Room/Floor No", "Route", "Outstanding Amount",
-    ]
-    for col_num, header in enumerate(headers, start=1):
-        col_letter = get_column_letter(col_num)
-        sheet[f"{col_letter}1"] = header
-
-    # Data rows
-    for index, customer in enumerate(instances, start=1):
-
-        # ---------- 1️⃣ OUTSTANDING AMOUNT USING INVOICE MODEL ----------
-        invoice_totals = Invoice.objects.filter(
-            customer=customer,
-            created_date__date__lte=date,
-            is_deleted=False
-        ).aggregate(
-            total_amount=Sum('amout_total'),
-            total_received=Sum('amout_recieved')
-        )
-
-        total_invoice_amount = invoice_totals["total_amount"] or Decimal("0.00")
-        total_received = invoice_totals["total_received"] or Decimal("0.00")
-        outstanding_amount = total_invoice_amount - total_received
-
-        # ---------- 2️⃣ BOTTLES ----------
-        outstanding_bottles = OutstandingProduct.objects.filter(
-            customer_outstanding__customer=customer,
-            customer_outstanding__created_date__date__lte=date
-        ).aggregate(total=Sum('empty_bottle'))['total'] or 0
-
-        # ---------- 3️⃣ COUPONS ----------
-        outstanding_coupons = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer=customer,
-            customer_outstanding__created_date__date__lte=date
-        ).aggregate(total=Sum('count'))['total'] or 0
-
-        # ---------- WRITE TO EXCEL ----------
-        row = [
-            index,
-            customer.custom_id,
-            customer.customer_name,
-            customer.building_name,
-            customer.door_house_no,
-            customer.routes.route_name if customer.routes else "",
-            outstanding_amount,
-            # outstanding_bottles,
-            # outstanding_coupons,
-        ]
-
-        for col_num, cell_value in enumerate(row, start=1):
-            sheet.cell(row=index + 1, column=col_num, value=cell_value)
-
-    # ---------- FOOTER TOTAL ----------
-    total_row_index = len(instances) + 2
-    sheet[f"F{total_row_index}"] = "Total:"
-    sheet[f"G{total_row_index}"] = total_amount
-    # sheet[f"H{total_row_index}"] = total_bottles
-    # sheet[f"I{total_row_index}"] = total_coupons
-
-    # ---------- GENERATE EXCEL ----------
-    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response['Content-Disposition'] = f'attachment; filename=\"Customer_Outstanding_{date}.xlsx\"'
-    workbook.save(response)
-    return response
-# def export_to_excel(instances, date, total_amount, total_bottles, total_coupons, product_type):
+# def export_to_excel(instances, date, total_amount, total_bottles, total_coupons):
 #     """
-#     Generate Excel for Customer Outstanding List, adjusting columns based on product_type.
+#     Generate correct Excel for Customer Outstanding List
+#     using Invoice model for amount outstanding.
 #     """
 #     workbook = Workbook()
 #     sheet = workbook.active
 #     sheet.title = "Customer Outstanding List"
 
-#     # --- 1. Dynamic Header Definition ---
-    
-#     base_headers = [
+#     # Header row
+#     headers = [
 #         "Sl No", "Customer ID", "Customer Name", "Building No",
-#         "Room/Floor No", "Route"
+#         "Room/Floor No", "Route", "Outstanding Amount",
 #     ]
-    
-#     # Add the specific header based on product_type
-#     if product_type == "amount":
-#         dynamic_headers = ["Outstanding Amount"]
-#     elif product_type == "emptycan":
-#         dynamic_headers = ["Outstanding Bottles"]
-#     elif product_type == "coupons":
-#         dynamic_headers = ["Outstanding Coupons"]
-#     else:
-#         # Default to showing all three if the type is unknown or 'all'
-#         dynamic_headers = ["Outstanding Amount", "Outstanding Bottles", "Outstanding Coupons"]
-
-
-#     headers = base_headers + dynamic_headers
-
 #     for col_num, header in enumerate(headers, start=1):
-#         sheet[f"{get_column_letter(col_num)}1"] = header
+#         col_letter = get_column_letter(col_num)
+#         sheet[f"{col_letter}1"] = header
 
-#     # --- 2. Dynamic Row Data Generation ---
-
+#     # Data rows
 #     for index, customer in enumerate(instances, start=1):
-#         # Calculate all three values (Amount, Bottles, Coupons) for the row data
-        
-#         # Amount Calculation
-#         outstanding_amount = OutstandingAmount.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total=Sum('amount'))['total'] or 0
 
-#         collection_amount = CollectionPayment.objects.filter(
+#         # ---------- 1️⃣ OUTSTANDING AMOUNT USING INVOICE MODEL ----------
+#         invoice_totals = Invoice.objects.filter(
 #             customer=customer,
-#             created_date__date__lte=date
-#         ).aggregate(total_received=Sum('amount_received'))['total_received'] or 0
+#             created_date__date__lte=date,
+#             is_deleted=False
+#         ).aggregate(
+#             total_amount=Sum('amout_total'),
+#             total_received=Sum('amout_recieved')
+#         )
 
-#         net_amount = outstanding_amount - collection_amount
-        
-#         # Bottles Calculation
+#         total_invoice_amount = invoice_totals["total_amount"] or Decimal("0.00")
+#         total_received = invoice_totals["total_received"] or Decimal("0.00")
+#         outstanding_amount = total_invoice_amount - total_received
+
+#         # ---------- 2️⃣ BOTTLES ----------
 #         outstanding_bottles = OutstandingProduct.objects.filter(
 #             customer_outstanding__customer=customer,
 #             customer_outstanding__created_date__date__lte=date
 #         ).aggregate(total=Sum('empty_bottle'))['total'] or 0
-        
-#         # Coupons Calculation
+
+#         # ---------- 3️⃣ COUPONS ----------
 #         outstanding_coupons = OutstandingCoupon.objects.filter(
 #             customer_outstanding__customer=customer,
 #             customer_outstanding__created_date__date__lte=date
 #         ).aggregate(total=Sum('count'))['total'] or 0
 
-#         # Base row data
-#         base_row_data = [
+#         # ---------- WRITE TO EXCEL ----------
+#         row = [
 #             index,
 #             customer.custom_id,
 #             customer.customer_name,
 #             customer.building_name,
 #             customer.door_house_no,
-#             getattr(customer.routes, 'route_name', ''),
+#             customer.routes.route_name if customer.routes else "",
+#             outstanding_amount,
+#             # outstanding_bottles,
+#             # outstanding_coupons,
 #         ]
 
-#         # Add specific outstanding data based on product_type
-#         if product_type == "amount":
-#             dynamic_row_data = [float(round(net_amount, 2))]
-#         elif product_type == "emptycan":
-#             dynamic_row_data = [int(outstanding_bottles)]
-#         elif product_type == "coupons":
-#             dynamic_row_data = [int(outstanding_coupons)]
-#         else:
-#              # Fallback to showing all three columns
-#             dynamic_row_data = [
-#                 float(round(net_amount, 2)),
-#                 int(outstanding_bottles),
-#                 int(outstanding_coupons)
-#             ]
+#         for col_num, cell_value in enumerate(row, start=1):
+#             sheet.cell(row=index + 1, column=col_num, value=cell_value)
 
-#         row = base_row_data + dynamic_row_data
-        
-#         for col_num, value in enumerate(row, start=1):
-#             sheet.cell(row=index + 1, column=col_num, value=value)
+#     # ---------- FOOTER TOTAL ----------
+#     total_row_index = len(instances) + 2
+#     sheet[f"F{total_row_index}"] = "Total:"
+#     sheet[f"G{total_row_index}"] = total_amount
+#     # sheet[f"H{total_row_index}"] = total_bottles
+#     # sheet[f"I{total_row_index}"] = total_coupons
 
-#     # --- 3. Dynamic Footer Totals ---
-#     total_row = len(instances) + 2
-#     sheet[f"F{total_row}"] = "Total:"
-    
-#     # Find the starting column for the dynamic data (G or the next one)
-#     start_col_num = len(base_headers) + 1
-#     total_col_letter = get_column_letter(start_col_num)
-
-#     if product_type == "amount":
-#         sheet[f"{total_col_letter}{total_row}"] = float(total_amount)
-#     elif product_type == "emptycan":
-#         sheet[f"{total_col_letter}{total_row}"] = int(total_bottles)
-#     elif product_type == "coupons":
-#         sheet[f"{total_col_letter}{total_row}"] = int(total_coupons)
-#     else:
-#         # Default to showing all three totals starting at column G (7)
-#         sheet[f"G{total_row}"] = float(total_amount)
-#         sheet[f"H{total_row}"] = int(total_bottles)
-#         sheet[f"I{total_row}"] = int(total_coupons)
-
-
-#     response = HttpResponse(
-#         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-#     )
-#     response['Content-Disposition'] = f'attachment; filename="Customer_Outstanding_{date}.xlsx"'
+#     # ---------- GENERATE EXCEL ----------
+#     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+#     response['Content-Disposition'] = f'attachment; filename=\"Customer_Outstanding_{date}.xlsx\"'
 #     workbook.save(response)
 #     return response
+def export_to_excel(instances, date, total_amount, total_bottles, total_coupons, product_type):
+    """
+    Generate Excel for Customer Outstanding List, adjusting columns based on product_type.
+    """
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Customer Outstanding List"
+
+    # --- 1. Dynamic Header Definition ---
+    
+    base_headers = [
+        "Sl No", "Customer ID", "Customer Name", "Building No",
+        "Room/Floor No", "Route"
+    ]
+    
+    # Add the specific header based on product_type
+    if product_type == "amount":
+        dynamic_headers = ["Outstanding Amount"]
+    elif product_type == "emptycan":
+        dynamic_headers = ["Outstanding Bottles"]
+    elif product_type == "coupons":
+        dynamic_headers = ["Outstanding Coupons"]
+    else:
+        # Default to showing all three if the type is unknown or 'all'
+        dynamic_headers = ["Outstanding Amount", "Outstanding Bottles", "Outstanding Coupons"]
+
+
+    headers = base_headers + dynamic_headers
+
+    for col_num, header in enumerate(headers, start=1):
+        sheet[f"{get_column_letter(col_num)}1"] = header
+
+    # --- 2. Dynamic Row Data Generation ---
+
+    for index, customer in enumerate(instances, start=1):
+        # Calculate all three values (Amount, Bottles, Coupons) for the row data
+        
+        # Amount Calculation
+        outstanding_amount = OutstandingAmount.objects.filter(
+            customer_outstanding__customer=customer,
+            customer_outstanding__created_date__date__lte=date
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        collection_amount = CollectionPayment.objects.filter(
+            customer=customer,
+            created_date__date__lte=date
+        ).aggregate(total_received=Sum('amount_received'))['total_received'] or 0
+
+        net_amount = outstanding_amount - collection_amount
+        
+        # Bottles Calculation
+        outstanding_bottles = OutstandingProduct.objects.filter(
+            customer_outstanding__customer=customer,
+            customer_outstanding__created_date__date__lte=date
+        ).aggregate(total=Sum('empty_bottle'))['total'] or 0
+        
+        # Coupons Calculation
+        outstanding_coupons = OutstandingCoupon.objects.filter(
+            customer_outstanding__customer=customer,
+            customer_outstanding__created_date__date__lte=date
+        ).aggregate(total=Sum('count'))['total'] or 0
+
+        # Base row data
+        base_row_data = [
+            index,
+            customer.custom_id,
+            customer.customer_name,
+            customer.building_name,
+            customer.door_house_no,
+            getattr(customer.routes, 'route_name', ''),
+        ]
+
+        # Add specific outstanding data based on product_type
+        if product_type == "amount":
+            dynamic_row_data = [float(round(net_amount, 2))]
+        elif product_type == "emptycan":
+            dynamic_row_data = [int(outstanding_bottles)]
+        elif product_type == "coupons":
+            dynamic_row_data = [int(outstanding_coupons)]
+        else:
+             # Fallback to showing all three columns
+            dynamic_row_data = [
+                float(round(net_amount, 2)),
+                int(outstanding_bottles),
+                int(outstanding_coupons)
+            ]
+
+        row = base_row_data + dynamic_row_data
+        
+        for col_num, value in enumerate(row, start=1):
+            sheet.cell(row=index + 1, column=col_num, value=value)
+
+    # --- 3. Dynamic Footer Totals ---
+    total_row = len(instances) + 2
+    sheet[f"F{total_row}"] = "Total:"
+    
+    # Find the starting column for the dynamic data (G or the next one)
+    start_col_num = len(base_headers) + 1
+    total_col_letter = get_column_letter(start_col_num)
+
+    if product_type == "amount":
+        sheet[f"{total_col_letter}{total_row}"] = float(total_amount)
+    elif product_type == "emptycan":
+        sheet[f"{total_col_letter}{total_row}"] = int(total_bottles)
+    elif product_type == "coupons":
+        sheet[f"{total_col_letter}{total_row}"] = int(total_coupons)
+    else:
+        # Default to showing all three totals starting at column G (7)
+        sheet[f"G{total_row}"] = float(total_amount)
+        sheet[f"H{total_row}"] = int(total_bottles)
+        sheet[f"I{total_row}"] = int(total_coupons)
+
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response['Content-Disposition'] = f'attachment; filename="Customer_Outstanding_{date}.xlsx"'
+    workbook.save(response)
+    return response
 
 def print_customer_outstanding(request):
     """
