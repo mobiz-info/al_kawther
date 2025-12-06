@@ -5,30 +5,28 @@ from . models import *
 # Register your models here.
 class CollectionPaymentAdmin(admin.ModelAdmin):
     # Show all fields dynamically
-    list_display = [field.name for field in CollectionPayment._meta.get_fields() if not field.many_to_many and not field.one_to_many]
-
-    # Searchable fields: CharField/TextField + related fields
-    search_fields = [
-        'receipt_number',
-        'customer__name',    # Assuming Customers has 'name' field
-        'salesman__username',# Assuming CustomUser has 'username' field
-        'payment_method'
+    list_display = [
+        'receipt_number','customer','salesman','payment_method','amount_received','total_amount','total_discounts','total_net_taxeble',
+        'total_vat','collected_amount','is_repeated_customer','created_date',
     ]
 
-    # Optional: Add filters for ForeignKeys or choices
-    list_filter = ('payment_method', 'salesman', 'created_date')
+    search_fields = ['receipt_number','customer__customer_name','salesman__username','payment_method',]
+
+    list_filter = ('payment_method','salesman','created_date',)
 
 # Admin for CollectionItems
 class CollectionItemsAdmin(admin.ModelAdmin):
-    list_display = [field.name for field in CollectionItems._meta.get_fields() if not field.many_to_many and not field.one_to_many]
+    list_display = ['invoice_number', 'amount', 'balance', 'amount_received', 'collection_payment']
+
+    def invoice_number(self, obj):
+        return obj.invoice.invoice_number
+    invoice_number.short_description = "Invoice Number"
 
     search_fields = [
-        'invoice__invoice_number',    # Assuming Invoice has invoice_number field
+        'invoice__invoice_number',
         'collection_payment__receipt_number',
-        'collection_payment__customer__name'
+        'collection_payment__customer__customer_name'
     ]
-
-    list_filter = ('collection_payment__payment_method',)
 
 admin.site.register(CollectionPayment, CollectionPaymentAdmin)
 admin.site.register(CollectionItems, CollectionItemsAdmin)
