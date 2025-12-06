@@ -4355,10 +4355,10 @@ def customer_transaction_list(request):
         total_manual_coupons += total_coupons.get('manual_coupon', 0)
         total_digital_coupons += total_coupons.get('digital_coupon', 0)
         
-    log_activity(
-        created_by=request.user if request.user.is_authenticated else None,
-        description="Viewed the customer transaction list with filters applied."
-    )
+    # log_activity(
+    #     created_by=request.user if request.user.is_authenticated else None,
+    #     description="Viewed the customer transaction list with filters applied."
+    # )
 
     context = {
         'sales_report_data': sales_report_data,
