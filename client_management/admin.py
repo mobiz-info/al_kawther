@@ -67,19 +67,63 @@ class CustomerOutstandingReportAdmin(admin.ModelAdmin):
     list_display = ('id','product_type','customer','value')
 admin.site.register(CustomerOutstandingReport,CustomerOutstandingReportAdmin)
 
+
 class CustomerSupplyAdmin(admin.ModelAdmin):
     list_display = (
-        'id','created_date','customer', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
+        'id','created_date','customer','invoice_no', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
         'allocate_bottle_to_custody', 'allocate_bottle_to_paid', 'discount',
         'net_payable', 'vat', 'subtotal', 'amount_recieved','outstanding_amount_added',
         'outstanding_coupon_added','outstanding_bottle_added','van_stock_added','van_foc_added',
         'van_emptycan_added','custody_added'
     )
     list_filter = ('salesman',)  # Other filters if needed
-    list_filter = ('customer__routes',)  # Other filters if needed
-    search_fields = ('customer__customer_name',)  # Search by customer name (ForeignKey field)
+    list_filter = ('customer__routes','created_date')  # Other filters if needed
+    search_fields = ('customer__customer_name','invoice_no')  # Search by customer name (ForeignKey field)
 
 admin.site.register(CustomerSupply, CustomerSupplyAdmin)
+class CustomerSupplyItemsAdmin(admin.ModelAdmin):
+
+    # Showing fields from CustomerSupplyItems + parent invoice + parent amount_recieved
+    list_display = (
+        'id',
+        'invoice_no',
+        'customer_name',
+        'product',
+        'quantity',
+        'rate',
+        'amount',
+        'foc',
+        'amount_recieved',     # From CustomerSupply
+        'created_date',
+    )
+
+    # Enable invoice search
+    search_fields = (
+        'customer_supply__invoice_no',
+        'customer_supply__customer__customer_name',
+    )
+
+    # ====================================================
+    # Custom display methods (because parent fields must be accessed)
+    # ====================================================
+    def invoice_no(self, obj):
+        return obj.customer_supply.invoice_no
+    invoice_no.short_description = "Invoice No"
+
+    def customer_name(self, obj):
+        return obj.customer_supply.customer.customer_name
+    customer_name.short_description = "Customer"
+
+    def amount_recieved(self, obj):
+        return obj.customer_supply.amount_recieved
+    amount_recieved.short_description = "Amount Received"
+
+    def created_date(self, obj):
+        return obj.customer_supply.created_date
+    created_date.short_description = "Created Date"
+
+
+admin.site.register(CustomerSupplyItems, CustomerSupplyItemsAdmin)
 
 admin.site.register(CustomerSupplyItems)
 admin.site.register(CustomerSupplyStock)
