@@ -89,7 +89,6 @@ class CustomerSupplyItemsAdmin(admin.ModelAdmin):
         'customer_name',
         'product',
         'quantity',
-        'rate',
         'amount',
         'foc',
         'amount_recieved',     # From CustomerSupply
