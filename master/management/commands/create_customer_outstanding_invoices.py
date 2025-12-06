@@ -91,7 +91,7 @@ class Command(BaseCommand):
                 outstanding.save()
                 
                 if out_amount.customer_outstanding.customer.sales_type == "CREDIT":
-                    invoice.invoice_type = "credit_invoice"
+                    invoice.invoice_type = "credit_invoive"
                     invoice.save()
 
                 # Create invoice items

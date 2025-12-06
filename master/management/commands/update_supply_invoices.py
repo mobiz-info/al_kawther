@@ -29,7 +29,7 @@ class Command(BaseCommand):
         #             if supply.subtotal == supply.amount_recieved:
         #                 invoices_instance.update(invoice_type="cash_invoice")
         #             else:
-        #                 invoices_instance.update(invoice_type="credit_invoice")
+        #                 invoices_instance.update(invoice_type="credit_invoive")
                     
         #             # Create the invoice
         #             invoice = Invoice.objects.create(
@@ -45,7 +45,7 @@ class Command(BaseCommand):
         #             )
                     
         #             if supply.customer.sales_type == "CREDIT":
-        #                 invoice.invoice_type = "credit_invoice"
+        #                 invoice.invoice_type = "credit_invoive"
         #             if invoice.amout_total == invoice.amout_recieved:
         #                 invoice.invoice_status = "paid"
         #             invoice.save()

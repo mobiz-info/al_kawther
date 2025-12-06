@@ -127,7 +127,7 @@ urlpatterns = [
     path('receipt_list_print/', receipt_list_print, name='receipt_list_print'),
     path('receipt_list_excel/', receipt_list_excel, name='receipt_list_excel'),
 
-    path('delete_receipt/<path:receipt_number>/<uuid:customer_id>/', delete_receipt, name='delete_receipt'),
+    path('delete_receipt/<str:receipt_number>/<uuid:customer_id>/', delete_receipt, name='delete_receipt'),
 
     path('monthly_sales_report/', monthly_sales_report, name='monthly_sales_report'),
     path('monthly_sales_report_print/', monthly_sales_report_print, name='monthly_sales_report_print'),

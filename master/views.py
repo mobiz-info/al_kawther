@@ -1729,7 +1729,7 @@ def create_outstanding_variation_invoice(request):
                 invoice = Invoice.objects.create(
                     reference_no=customer.custom_id,
                     invoice_no=invoice_no,
-                    invoice_type="credit_invoice",
+                    invoice_type="credit_invoive",
                     invoice_status=invoice_status,
                     created_date=datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M"),
                     net_taxable=amount,

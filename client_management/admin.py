@@ -38,8 +38,6 @@ class CustomerOutstandingAmountAdmin(admin.ModelAdmin):
         'customer',
         'amount'
     )
-    search_fields = ('customer_outstanding__invoice_no','customer_outstanding__customer__customer_name',)
-    list_filter = ['customer_outstanding__created_date'] 
     ordering = ("-customer_outstanding__created_date",)
     
     def invoice_no(self, obj):
@@ -67,21 +65,19 @@ admin.site.register(OutstandingAmount, CustomerOutstandingAmountAdmin)
 admin.site.register(OutstandingCoupon)
 class CustomerOutstandingReportAdmin(admin.ModelAdmin):
     list_display = ('id','product_type','customer','value')
-    search_fields = ['customer__custom_id','customer__customer_name']
-
 admin.site.register(CustomerOutstandingReport,CustomerOutstandingReportAdmin)
 
 class CustomerSupplyAdmin(admin.ModelAdmin):
     list_display = (
-        'id','created_date','customer','invoice_no', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
+        'id','created_date','customer', 'salesman', 'grand_total', 'allocate_bottle_to_pending',
         'allocate_bottle_to_custody', 'allocate_bottle_to_paid', 'discount',
         'net_payable', 'vat', 'subtotal', 'amount_recieved','outstanding_amount_added',
         'outstanding_coupon_added','outstanding_bottle_added','van_stock_added','van_foc_added',
         'van_emptycan_added','custody_added'
     )
     list_filter = ('salesman',)  # Other filters if needed
-    list_filter = ('customer__routes','created_date')  # Other filters if needed
-    search_fields = ('customer__customer_name','invoice_no')  # Search by customer name (ForeignKey field)
+    list_filter = ('customer__routes',)  # Other filters if needed
+    search_fields = ('customer__customer_name',)  # Search by customer name (ForeignKey field)
 
 admin.site.register(CustomerSupply, CustomerSupplyAdmin)
 

@@ -119,21 +119,17 @@
                                     <td>{{ customer.door_house_no }}</td>
                                     <td>{{ customer.routes.route_name }}</td>
                                     {% if filter_data.product_type == 'amount' %}
-                                    <td>{{ customer.outstanding_amount }}</td>
+                                    <td class="out_amount">{{ outstanding_amount }}</td>
                                     {% endif %}
                                     {% if filter_data.product_type == 'emptycan' %}
-                                    <td>{{ customer.outstanding_bottles }}</td>
+                                    <td>{{ outstanding_bottles }}</td>
                                     {% endif %}
                                     {% if filter_data.product_type == 'coupons' %}
-                                    <td>{{ customer.outstanding_coupons }}</td>
+                                    <td>{{ outstanding_coupons }}</td>
                                     {% endif %}
                                     <td class="text-center">
                                         <div class="g-2">
                                             <a href="{% url 'customer_outstanding_details' customer.pk %}?product_type={{ filter_data.product_type }}" class="btn btn-warning-light btn-sm" data-bs-toggle="tooltip" title="View">
-                                                <span class="bi bi-eye fs-14"></span>
-                                            </a>
-                                            <!-- New eye button for Action Head -->
-                                            <a href="{% url 'customer_outstanding_view' customer.pk %}?product_type={{ filter_data.product_type }}" class="btn btn-info-light btn-sm" data-bs-toggle="tooltip" title="Action Head View">
                                                 <span class="bi bi-eye fs-14"></span>
                                             </a>
                                         </div>
@@ -145,7 +141,7 @@
                                 <tr>
                                     <td colspan="6" class="text-end fw-bold">Total Outstanding Amount:</td>
                                     {% if filter_data.product_type == 'amount' %}
-                                    <td class="fw-bold">{{ net_total_outstanding }}</td>
+                                    <td class="fw-bold total_out_amount">{{ total_outstanding_amount }}</td>
                                     {% endif %}
                                     {% if filter_data.product_type == 'emptycan' %}
                                     <td class="fw-bold">{{ total_outstanding_bottles }}</td>

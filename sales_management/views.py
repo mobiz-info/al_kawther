@@ -3933,7 +3933,7 @@ def dsr_credit_outstanding(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,amount_received__gt=0) 
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         total_amount_received_upto_today = dialy_collections.filter(created_date__date__lte=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - total_amount_received_upto_today
@@ -3990,7 +3990,7 @@ def dsr_credit_outstanding_print(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman,amount_received__gt=0) 
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         total_amount_received_upto_today = dialy_collections.filter(created_date__date__lte=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - total_amount_received_upto_today
@@ -5051,7 +5051,7 @@ def dsr_summary1(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
@@ -5540,7 +5540,7 @@ def print_dsr_summary(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         # todays_opening_outstanding_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         # dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         
@@ -5857,7 +5857,7 @@ def print_dsr_summary(request):
 #         cash_total_amout_total = cash_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
         
 #         ### credit sales ####
-#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoice")
+#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoive")
 #         credit_total_net_taxable = credit_invoices.aggregate(total_net_taxable=Sum('net_taxable'))['total_net_taxable'] or 0
 #         credit_total_vat = credit_invoices.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
 #         credit_total_amout_total = credit_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
@@ -6047,7 +6047,7 @@ def print_dsr_summary(request):
 #         cash_total_amout_total = cash_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
         
 #         ### credit sales ####
-#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoice")
+#         credit_invoices = Invoice.objects.filter(created_date__date=date, invoice_type="credit_invoive")
 #         credit_total_net_taxable = credit_invoices.aggregate(total_net_taxable=Sum('net_taxable'))['total_net_taxable'] or 0
 #         credit_total_vat = credit_invoices.aggregate(total_vat=Sum('vat'))['total_vat'] or 0
 #         credit_total_amout_total = credit_invoices.aggregate(total_amout_total=Sum('amout_total'))['total_amout_total'] or 0
@@ -6596,7 +6596,7 @@ def dsr(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday
@@ -7035,7 +7035,7 @@ def print_dsr(request):
         # collection details
         dialy_collections = CollectionPayment.objects.filter(salesman_id=salesman)
         # credit outstanding
-        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoice",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
+        # outstanding_credit_notes = Invoice.objects.filter(invoice_type="credit_invoive",customer__sales_staff=salesman).exclude(created_date__date__gt=date)
         outstanding_credit_notes_total_amount = OutstandingAmount.objects.filter(customer_outstanding__created_date__date__lte=date,customer_outstanding__product_type="amount",customer_outstanding__customer__routes=van_route.routes).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto__yesterday = dialy_collections.filter(created_date__date__lt=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         outstanding_credit_notes_total_amount = outstanding_credit_notes_total_amount - dialy_colection_upto__yesterday

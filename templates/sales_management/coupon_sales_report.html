@@ -45,7 +45,7 @@
                                 <select name="sales_type" class="form-select">
                                     <option value="">All Sales Types</option>
                                     <option value="CASH COUPON" {% if filter_data.sales_type == 'CASH COUPON' %}selected{% endif %}>CASH COUPON</option>
-                                    {% comment %} <option value="FOC" {% if filter_data.sales_type == 'FOC' %}selected{% endif %}>FOC</option> {% endcomment %}
+                                    <option value="FOC" {% if filter_data.sales_type == 'FOC' %}selected{% endif %}>FOC</option>
                                     <option value="CASH" {% if filter_data.sales_type == 'CASH' %}selected{% endif %}>CASH</option>
                                     <option value="CREDIT" {% if filter_data.sales_type == 'CREDIT' %}selected{% endif %}>CREDIT</option>
                                 </select>

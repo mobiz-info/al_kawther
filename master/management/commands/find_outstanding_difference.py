@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
             # --- Credit invoices (if any)
             credit_total = Invoice.objects.filter(
-                invoice_type="credit_invoice",
+                invoice_type="credit_invoive",
                 customer__routes__route_name=route_name,
                 created_date__date__lte=d
             ).aggregate(total=Sum('amout_total'))['total'] or 0
@@ -108,7 +108,7 @@ class Command(BaseCommand):
                     ).aggregate(total=Sum('amount_received'))['total'] or 0
 
                     credit_c = Invoice.objects.filter(
-                        invoice_type="credit_invoice",
+                        invoice_type="credit_invoive",
                         customer=c,
                         created_date__date__lte=d
                     ).aggregate(total=Sum('amout_recieved'))['total'] or 0

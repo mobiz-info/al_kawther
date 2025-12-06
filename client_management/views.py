@@ -959,7 +959,7 @@ def customer_supply_customers(request):
 #                 #     customer_outstanding_coupon.save()
                 
 #                 if customer_suply_form_instance.customer.sales_type == "CREDIT":
-#                     invoice.invoice_type = "credit_invoice"
+#                     invoice.invoice_type = "credit_invoive"
 #                     invoice.save()
 
 #                 # Create invoice items
@@ -1852,7 +1852,7 @@ def edit_customer_supply(request, pk):
                             customer_outstanding_amount.save()
                         
                         if customer_suply_form_instance.customer.sales_type == "CREDIT":
-                            invoice.invoice_type = "credit_invoice"
+                            invoice.invoice_type = "credit_invoive"
                             invoice.save()
 
                         # Create invoice items
@@ -2550,269 +2550,142 @@ from datetime import datetime
 from django.db.models import Q, Sum
 from django.shortcuts import render
 
-# def customer_outstanding_list(request):
-#     """
-#     Customer Outstanding List with Excel Export
-#     """
-#     filter_data = {}
-#     q = request.GET.get('q', '')  
-#     route_name = request.GET.get('route_name', '')
-#     date_str = request.GET.get('date')
-#     product_type = request.GET.get('product_type', 'amount')
-    
-#     route_li = RouteMaster.objects.all()
-#     filter_data['product_type'] = product_type
-
-#     if date_str:
-#         date = datetime.strptime(date_str, '%Y-%m-%d').date() 
-#     else:
-#         date = datetime.today().date()
-#     filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-
-#     # --- INITIAL FILTERING FOR ROUTE AND DATE ---
-#     if route_name:
-#         pass # Route filter applied later
-#     elif route_li.exists():
-#         route_name = route_li.first().route_name
-#     filter_data['route_name'] = route_name
-    
-#     # Base QuerySet for ALL customers on the route
-#     all_customers_on_route = Customers.objects.filter(is_guest=False, routes__route_name=route_name)
-
-#     if customer_pk := request.GET.get("customer_pk"):
-#         all_customers_on_route = all_customers_on_route.filter(pk=customer_pk)
-#         filter_data['customer_pk'] = customer_pk
-
-#     if q:
-#         all_customers_on_route = all_customers_on_route.filter(customer_name__icontains=q)
-#         filter_data['q'] = q
-
-#     # --- 1. EFFICIENT AGGREGATION (CALCULATES THE TRUE TOTAL: 20694.80) ---
-
-#     # Total Outstanding Debits for the route (113193.20)
-#     total_amount_t = OutstandingAmount.objects.filter(
-#         customer_outstanding__customer__routes__route_name=route_name,
-#         customer_outstanding__created_date__date__lte=date
-#     ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-    
-#     # Total Collections Credits for the route (92498.40)
-#     total_collection_t = CollectionPayment.objects.filter(
-#         created_date__date__lte=date,
-#         customer__routes__route_name=route_name
-#     ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
-
-#     # Store the correct net total for final use, rounded to 2 decimals
-#     correct_route_net_amount = total_amount_t - total_collection_t
-#     total_outstanding_amount = round(correct_route_net_amount, 2)
-    
-#     # Print the correct value: 20694.80
-#     print(f"Correct Net Total: {total_outstanding_amount}") 
-
-#     # --- 2. CUSTOMER LOOP (ITERATE OVER ALL, FILTER NON-ZERO, ACCUMULATE BOTTLES/COUPONS) ---
-    
-#     instances = []
-#     total_outstanding_bottles = 0
-#     total_outstanding_coupons = 0
-#     # total_outstanding_amount is already correctly set above.
-
-#     for customer in all_customers_on_route:
-#         net_amount = 0
-#         total_bottles = 0
-#         total_coupons = 0
-
-#         # Calculate individual balances regardless of product_type for inclusion check
-        
-#         # Calculate Amount Balance
-#         outstanding_amount = OutstandingAmount.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-
-#         collection_amount_customer = CollectionPayment.objects.filter(
-#             customer=customer,
-#             created_date__date__lte=date
-#         ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
-
-#         net_amount = outstanding_amount - collection_amount_customer
-            
-#         # Calculate Bottle Balance
-#         total_bottles = OutstandingProduct.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total_bottles=Sum('empty_bottle'))['total_bottles'] or 0
-
-#         # Calculate Coupon Balance
-#         total_coupons = OutstandingCoupon.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total_coupons=Sum('count'))['total_coupons'] or 0
-        
-#         # Only include customers with a non-zero balance for the CURRENTLY SELECTED product_type
-#         is_non_zero_balance = False
-#         if product_type == "amount" and round(net_amount, 2) != 0:
-#              is_non_zero_balance = True
-#         elif product_type == "emptycan" and total_bottles != 0:
-#              is_non_zero_balance = True
-#         elif product_type == "coupons" and total_coupons != 0:
-#              is_non_zero_balance = True
-             
-#         # If the customer has a non-zero balance, add them to the list and accumulate totals
-#         if is_non_zero_balance:
-#             instances.append(customer)
-            
-#             # Accumulate bottle and coupon totals
-#             total_outstanding_bottles += total_bottles
-#             total_outstanding_coupons += total_coupons
-            
-#     if request.GET.get('export') == 'excel':
-#         return export_to_excel(
-#             instances,
-#             date,
-#             total_outstanding_amount, # Uses the correct total (20694.80)
-#             total_outstanding_bottles,
-#             total_outstanding_coupons,
-#             product_type
-#         )
-
-#     context = {
-#         'instances': instances,
-#         'filter_data': filter_data,
-#         'route_li': route_li,
-#         'date': date,
-#         'customer_pk': customer_pk,
-#         'route_name': route_name,
-#         'page_name': 'Customer Outstanding List',
-#         'page_title': 'Customer Outstanding List',
-#         'is_customer_outstanding': True,
-#         'is_need_datetime_picker': True,
-#         'total_outstanding_amount': total_outstanding_amount, 
-#         'total_outstanding_bottles': total_outstanding_bottles,
-#         'total_outstanding_coupons': total_outstanding_coupons,
-#     }
-
-#     return render(request, 'client_management/customer_outstanding/list.html', context)
-
 def customer_outstanding_list(request):
     """
     Customer Outstanding List with Excel Export
-    :param request:
-    :return: Customer Outstanding list view or Excel file
     """
     filter_data = {}
     q = request.GET.get('q', '')  
     route_name = request.GET.get('route_name', '')
-    date = request.GET.get('date')
+    date_str = request.GET.get('date')
     product_type = request.GET.get('product_type', 'amount')
     
-    # Prepare route list
     route_li = RouteMaster.objects.all()
-    
     filter_data['product_type'] = product_type
-    
-    # Set default date if not provided
-    if date:
-        date = datetime.strptime(date, '%Y-%m-%d').date()
+
+    if date_str:
+        date = datetime.strptime(date_str, '%Y-%m-%d').date() 
     else:
         date = datetime.today().date()
     filter_data['filter_date'] = date.strftime('%Y-%m-%d')
+
+    # --- INITIAL FILTERING FOR ROUTE AND DATE ---
+    if route_name:
+        pass # Route filter applied later
+    elif route_li.exists():
+        route_name = route_li.first().route_name
+    filter_data['route_name'] = route_name
     
-    # Base queryset for outstanding instances
-    outstanding_instances = CustomerOutstanding.objects.filter(created_date__date__lte=date, product_type=product_type)
-    
-    # Apply additional filters
+    # Base QuerySet for ALL customers on the route
+    all_customers_on_route = Customers.objects.filter(is_guest=False, routes__route_name=route_name)
+
     if customer_pk := request.GET.get("customer_pk"):
-        outstanding_instances = outstanding_instances.filter(customer__pk=customer_pk)
+        all_customers_on_route = all_customers_on_route.filter(pk=customer_pk)
         filter_data['customer_pk'] = customer_pk
 
-    if route_name:
-        outstanding_instances = outstanding_instances.filter(customer__routes__route_name=route_name)
-    else:
-        route_name = route_li.first().route_name
-        outstanding_instances = outstanding_instances.filter(customer__routes__route_name=route_name)
-    filter_data['route_name'] = route_name
-
-    customer_ids = outstanding_instances.values_list("customer__pk", flat=True).distinct()
-
-    instances = Customers.objects.filter(
-        pk__in=customer_ids,
-        routes__route_name=route_name,
-        is_deleted=False
-    ).distinct()
-
-    # Apply search on customers (VERY IMPORTANT)
     if q:
-        instances = instances.filter(
-            Q(customer_name__icontains=q) |
-            Q(custom_id__icontains=q)
-        )
+        all_customers_on_route = all_customers_on_route.filter(customer_name__icontains=q)
         filter_data['q'] = q
-   
 
-    # Initialize totals
-    total_outstanding_amount = 0
+    # --- 1. EFFICIENT AGGREGATION (CALCULATES THE TRUE TOTAL: 20694.80) ---
+
+    # Total Outstanding Debits for the route (113193.20)
+    total_amount_t = OutstandingAmount.objects.filter(
+        customer_outstanding__customer__routes__route_name=route_name,
+        customer_outstanding__created_date__date__lte=date
+    ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+    
+    # Total Collections Credits for the route (92498.40)
+    total_collection_t = CollectionPayment.objects.filter(
+        created_date__date__lte=date,
+        customer__routes__route_name=route_name
+    ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
+
+    # Store the correct net total for final use, rounded to 2 decimals
+    correct_route_net_amount = total_amount_t - total_collection_t
+    total_outstanding_amount = round(correct_route_net_amount, 2)
+    
+    # Print the correct value: 20694.80
+    print(f"Correct Net Total: {total_outstanding_amount}") 
+
+    # --- 2. CUSTOMER LOOP (ITERATE OVER ALL, FILTER NON-ZERO, ACCUMULATE BOTTLES/COUPONS) ---
+    
+    instances = []
     total_outstanding_bottles = 0
     total_outstanding_coupons = 0
-    filtered_instances = []
+    # total_outstanding_amount is already correctly set above.
 
-    # Calculate totals for each customer and filter out those with zero outstanding values
-    for customer in instances:
-        # outstanding_amount = OutstandingAmount.objects.filter(
-        #     customer_outstanding__customer__pk=customer.pk, 
-        #     customer_outstanding__created_date__date__lte=date
-        # ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+    for customer in all_customers_on_route:
+        net_amount = 0
+        total_bottles = 0
+        total_coupons = 0
+
+        # Calculate individual balances regardless of product_type for inclusion check
         
-        invoice_totals = Invoice.objects.filter(
+        # Calculate Amount Balance
+        outstanding_amount = OutstandingAmount.objects.filter(
+            customer_outstanding__customer=customer,
+            customer_outstanding__created_date__date__lte=date
+        ).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+
+        collection_amount_customer = CollectionPayment.objects.filter(
             customer=customer,
-            created_date__date__lte=date,
-            is_deleted=False
-        ).aggregate(
-            total_amount=Sum('amout_total'),
-            total_received=Sum('amout_recieved')
-        )
+            created_date__date__lte=date
+        ).aggregate(total_amount_received=Sum('amount_received'))['total_amount_received'] or 0
 
-        total_amount = invoice_totals["total_amount"] or Decimal("0.00")
-        total_received = invoice_totals["total_received"] or Decimal("0.00")
-
-        outstanding_amount = total_amount - total_received
-
-        
-        
-        # outstanding_amount -= collection_amount
-        total_outstanding_amount += outstanding_amount
-        
+        net_amount = outstanding_amount - collection_amount_customer
+            
+        # Calculate Bottle Balance
         total_bottles = OutstandingProduct.objects.filter(
-            customer_outstanding__customer__pk=customer.pk, 
+            customer_outstanding__customer=customer,
             customer_outstanding__created_date__date__lte=date
         ).aggregate(total_bottles=Sum('empty_bottle'))['total_bottles'] or 0
-        total_outstanding_bottles += total_bottles
 
+        # Calculate Coupon Balance
         total_coupons = OutstandingCoupon.objects.filter(
-            customer_outstanding__customer__pk=customer.pk,
+            customer_outstanding__customer=customer,
             customer_outstanding__created_date__date__lte=date
         ).aggregate(total_coupons=Sum('count'))['total_coupons'] or 0
-        total_outstanding_coupons += total_coupons
-        customer.outstanding_amount = outstanding_amount
-        customer.outstanding_bottles = total_bottles
-        customer.outstanding_coupons = total_coupons
-        # Only add customers with non-zero outstanding values to the filtered list
-        if outstanding_amount != 0 :
-            filtered_instances.append(customer)
-    print("Calculated Total Outstanding:", total_outstanding_amount)
-    # Handle Excel export
+        
+        # Only include customers with a non-zero balance for the CURRENTLY SELECTED product_type
+        is_non_zero_balance = False
+        if product_type == "amount" and round(net_amount, 2) != 0:
+             is_non_zero_balance = True
+        elif product_type == "emptycan" and total_bottles != 0:
+             is_non_zero_balance = True
+        elif product_type == "coupons" and total_coupons != 0:
+             is_non_zero_balance = True
+             
+        # If the customer has a non-zero balance, add them to the list and accumulate totals
+        if is_non_zero_balance:
+            instances.append(customer)
+            
+            # Accumulate bottle and coupon totals
+            total_outstanding_bottles += total_bottles
+            total_outstanding_coupons += total_coupons
+            
     if request.GET.get('export') == 'excel':
-        return export_to_excel(filtered_instances, date, total_outstanding_amount, total_outstanding_bottles, total_outstanding_coupons)
-    
+        return export_to_excel(
+            instances,
+            date,
+            total_outstanding_amount, # Uses the correct total (20694.80)
+            total_outstanding_bottles,
+            total_outstanding_coupons,
+            product_type
+        )
+
     context = {
-        'instances': filtered_instances,
+        'instances': instances,
         'filter_data': filter_data,
         'route_li': route_li,
         'date': date,
         'customer_pk': customer_pk,
+        'route_name': route_name,
         'page_name': 'Customer Outstanding List',
         'page_title': 'Customer Outstanding List',
         'is_customer_outstanding': True,
         'is_need_datetime_picker': True,
-        'net_total_outstanding': total_outstanding_amount,
+        'total_outstanding_amount': total_outstanding_amount, 
         'total_outstanding_bottles': total_outstanding_bottles,
         'total_outstanding_coupons': total_outstanding_coupons,
     }
@@ -2820,200 +2693,125 @@ def customer_outstanding_list(request):
     return render(request, 'client_management/customer_outstanding/list.html', context)
 
 
-def export_to_excel(instances, date, total_amount, total_bottles, total_coupons):
+def export_to_excel(instances, date, total_amount, total_bottles, total_coupons, product_type):
     """
-    Generate correct Excel for Customer Outstanding List
-    using Invoice model for amount outstanding.
+    Generate Excel for Customer Outstanding List, adjusting columns based on product_type.
     """
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Customer Outstanding List"
 
-    # Header row
-    headers = [
+    # --- 1. Dynamic Header Definition ---
+    
+    base_headers = [
         "Sl No", "Customer ID", "Customer Name", "Building No",
-        "Room/Floor No", "Route", "Outstanding Amount",
+        "Room/Floor No", "Route"
     ]
+    
+    # Add the specific header based on product_type
+    if product_type == "amount":
+        dynamic_headers = ["Outstanding Amount"]
+    elif product_type == "emptycan":
+        dynamic_headers = ["Outstanding Bottles"]
+    elif product_type == "coupons":
+        dynamic_headers = ["Outstanding Coupons"]
+    else:
+        # Default to showing all three if the type is unknown or 'all'
+        dynamic_headers = ["Outstanding Amount", "Outstanding Bottles", "Outstanding Coupons"]
+
+
+    headers = base_headers + dynamic_headers
+
     for col_num, header in enumerate(headers, start=1):
-        col_letter = get_column_letter(col_num)
-        sheet[f"{col_letter}1"] = header
+        sheet[f"{get_column_letter(col_num)}1"] = header
 
-    # Data rows
+    # --- 2. Dynamic Row Data Generation ---
+
     for index, customer in enumerate(instances, start=1):
+        # Calculate all three values (Amount, Bottles, Coupons) for the row data
+        
+        # Amount Calculation
+        outstanding_amount = OutstandingAmount.objects.filter(
+            customer_outstanding__customer=customer,
+            customer_outstanding__created_date__date__lte=date
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
-        # ---------- 1️⃣ OUTSTANDING AMOUNT USING INVOICE MODEL ----------
-        invoice_totals = Invoice.objects.filter(
+        collection_amount = CollectionPayment.objects.filter(
             customer=customer,
-            created_date__date__lte=date,
-            is_deleted=False
-        ).aggregate(
-            total_amount=Sum('amout_total'),
-            total_received=Sum('amout_recieved')
-        )
+            created_date__date__lte=date
+        ).aggregate(total_received=Sum('amount_received'))['total_received'] or 0
 
-        total_invoice_amount = invoice_totals["total_amount"] or Decimal("0.00")
-        total_received = invoice_totals["total_received"] or Decimal("0.00")
-        outstanding_amount = total_invoice_amount - total_received
-
-        # ---------- 2️⃣ BOTTLES ----------
+        net_amount = outstanding_amount - collection_amount
+        
+        # Bottles Calculation
         outstanding_bottles = OutstandingProduct.objects.filter(
             customer_outstanding__customer=customer,
             customer_outstanding__created_date__date__lte=date
         ).aggregate(total=Sum('empty_bottle'))['total'] or 0
-
-        # ---------- 3️⃣ COUPONS ----------
+        
+        # Coupons Calculation
         outstanding_coupons = OutstandingCoupon.objects.filter(
             customer_outstanding__customer=customer,
             customer_outstanding__created_date__date__lte=date
         ).aggregate(total=Sum('count'))['total'] or 0
 
-        # ---------- WRITE TO EXCEL ----------
-        row = [
+        # Base row data
+        base_row_data = [
             index,
             customer.custom_id,
             customer.customer_name,
             customer.building_name,
             customer.door_house_no,
-            customer.routes.route_name if customer.routes else "",
-            outstanding_amount,
-            # outstanding_bottles,
-            # outstanding_coupons,
+            getattr(customer.routes, 'route_name', ''),
         ]
 
-        for col_num, cell_value in enumerate(row, start=1):
-            sheet.cell(row=index + 1, column=col_num, value=cell_value)
+        # Add specific outstanding data based on product_type
+        if product_type == "amount":
+            dynamic_row_data = [float(round(net_amount, 2))]
+        elif product_type == "emptycan":
+            dynamic_row_data = [int(outstanding_bottles)]
+        elif product_type == "coupons":
+            dynamic_row_data = [int(outstanding_coupons)]
+        else:
+             # Fallback to showing all three columns
+            dynamic_row_data = [
+                float(round(net_amount, 2)),
+                int(outstanding_bottles),
+                int(outstanding_coupons)
+            ]
 
-    # ---------- FOOTER TOTAL ----------
-    total_row_index = len(instances) + 2
-    sheet[f"F{total_row_index}"] = "Total:"
-    sheet[f"G{total_row_index}"] = total_amount
-    # sheet[f"H{total_row_index}"] = total_bottles
-    # sheet[f"I{total_row_index}"] = total_coupons
+        row = base_row_data + dynamic_row_data
+        
+        for col_num, value in enumerate(row, start=1):
+            sheet.cell(row=index + 1, column=col_num, value=value)
 
-    # ---------- GENERATE EXCEL ----------
-    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response['Content-Disposition'] = f'attachment; filename=\"Customer_Outstanding_{date}.xlsx\"'
+    # --- 3. Dynamic Footer Totals ---
+    total_row = len(instances) + 2
+    sheet[f"F{total_row}"] = "Total:"
+    
+    # Find the starting column for the dynamic data (G or the next one)
+    start_col_num = len(base_headers) + 1
+    total_col_letter = get_column_letter(start_col_num)
+
+    if product_type == "amount":
+        sheet[f"{total_col_letter}{total_row}"] = float(total_amount)
+    elif product_type == "emptycan":
+        sheet[f"{total_col_letter}{total_row}"] = int(total_bottles)
+    elif product_type == "coupons":
+        sheet[f"{total_col_letter}{total_row}"] = int(total_coupons)
+    else:
+        # Default to showing all three totals starting at column G (7)
+        sheet[f"G{total_row}"] = float(total_amount)
+        sheet[f"H{total_row}"] = int(total_bottles)
+        sheet[f"I{total_row}"] = int(total_coupons)
+
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response['Content-Disposition'] = f'attachment; filename="Customer_Outstanding_{date}.xlsx"'
     workbook.save(response)
     return response
-# def export_to_excel(instances, date, total_amount, total_bottles, total_coupons, product_type):
-#     """
-#     Generate Excel for Customer Outstanding List, adjusting columns based on product_type.
-#     """
-#     workbook = Workbook()
-#     sheet = workbook.active
-#     sheet.title = "Customer Outstanding List"
-
-#     # --- 1. Dynamic Header Definition ---
-    
-#     base_headers = [
-#         "Sl No", "Customer ID", "Customer Name", "Building No",
-#         "Room/Floor No", "Route"
-#     ]
-    
-#     # Add the specific header based on product_type
-#     if product_type == "amount":
-#         dynamic_headers = ["Outstanding Amount"]
-#     elif product_type == "emptycan":
-#         dynamic_headers = ["Outstanding Bottles"]
-#     elif product_type == "coupons":
-#         dynamic_headers = ["Outstanding Coupons"]
-#     else:
-#         # Default to showing all three if the type is unknown or 'all'
-#         dynamic_headers = ["Outstanding Amount", "Outstanding Bottles", "Outstanding Coupons"]
-
-
-#     headers = base_headers + dynamic_headers
-
-#     for col_num, header in enumerate(headers, start=1):
-#         sheet[f"{get_column_letter(col_num)}1"] = header
-
-#     # --- 2. Dynamic Row Data Generation ---
-
-#     for index, customer in enumerate(instances, start=1):
-#         # Calculate all three values (Amount, Bottles, Coupons) for the row data
-        
-#         # Amount Calculation
-#         outstanding_amount = OutstandingAmount.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total=Sum('amount'))['total'] or 0
-
-#         collection_amount = CollectionPayment.objects.filter(
-#             customer=customer,
-#             created_date__date__lte=date
-#         ).aggregate(total_received=Sum('amount_received'))['total_received'] or 0
-
-#         net_amount = outstanding_amount - collection_amount
-        
-#         # Bottles Calculation
-#         outstanding_bottles = OutstandingProduct.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total=Sum('empty_bottle'))['total'] or 0
-        
-#         # Coupons Calculation
-#         outstanding_coupons = OutstandingCoupon.objects.filter(
-#             customer_outstanding__customer=customer,
-#             customer_outstanding__created_date__date__lte=date
-#         ).aggregate(total=Sum('count'))['total'] or 0
-
-#         # Base row data
-#         base_row_data = [
-#             index,
-#             customer.custom_id,
-#             customer.customer_name,
-#             customer.building_name,
-#             customer.door_house_no,
-#             getattr(customer.routes, 'route_name', ''),
-#         ]
-
-#         # Add specific outstanding data based on product_type
-#         if product_type == "amount":
-#             dynamic_row_data = [float(round(net_amount, 2))]
-#         elif product_type == "emptycan":
-#             dynamic_row_data = [int(outstanding_bottles)]
-#         elif product_type == "coupons":
-#             dynamic_row_data = [int(outstanding_coupons)]
-#         else:
-#              # Fallback to showing all three columns
-#             dynamic_row_data = [
-#                 float(round(net_amount, 2)),
-#                 int(outstanding_bottles),
-#                 int(outstanding_coupons)
-#             ]
-
-#         row = base_row_data + dynamic_row_data
-        
-#         for col_num, value in enumerate(row, start=1):
-#             sheet.cell(row=index + 1, column=col_num, value=value)
-
-#     # --- 3. Dynamic Footer Totals ---
-#     total_row = len(instances) + 2
-#     sheet[f"F{total_row}"] = "Total:"
-    
-#     # Find the starting column for the dynamic data (G or the next one)
-#     start_col_num = len(base_headers) + 1
-#     total_col_letter = get_column_letter(start_col_num)
-
-#     if product_type == "amount":
-#         sheet[f"{total_col_letter}{total_row}"] = float(total_amount)
-#     elif product_type == "emptycan":
-#         sheet[f"{total_col_letter}{total_row}"] = int(total_bottles)
-#     elif product_type == "coupons":
-#         sheet[f"{total_col_letter}{total_row}"] = int(total_coupons)
-#     else:
-#         # Default to showing all three totals starting at column G (7)
-#         sheet[f"G{total_row}"] = float(total_amount)
-#         sheet[f"H{total_row}"] = int(total_bottles)
-#         sheet[f"I{total_row}"] = int(total_coupons)
-
-
-#     response = HttpResponse(
-#         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-#     )
-#     response['Content-Disposition'] = f'attachment; filename="Customer_Outstanding_{date}.xlsx"'
-#     workbook.save(response)
-#     return response
 
 def print_customer_outstanding(request):
     """
@@ -3254,331 +3052,54 @@ def excel_customer_outstanding(request):
     return response
 
 
-# @login_required
-# def customer_outstanding_details(request,customer_pk):
-#     """
-#     Customer Outstanding details List
-#     :param request:
-#     :return: Customer Outstanding list view
-#     """
-#     filter_data = {}
-#     query = request.GET.get("q")
-#     date = request.GET.get('date')
-#     route_filter = request.GET.get('route_name')
-#     product_type = request.GET.get('product_type', 'amount')
-#     filter_data['product_type'] = product_type
+@login_required
+def customer_outstanding_details(request,customer_pk):
+    """
+    Customer Outstanding details List
+    :param request:
+    :return: Customer Outstanding list view
+    """
+    filter_data = {}
+    query = request.GET.get("q")
+    date = request.GET.get('date')
+    route_filter = request.GET.get('route_name')
+    product_type = request.GET.get('product_type', 'amount')
+    filter_data['product_type'] = product_type
     
-#     instances = CustomerOutstanding.objects.filter(customer__pk=customer_pk,product_type=product_type)
-#     if date:
-#         date = datetime.strptime(date, '%Y-%m-%d').date()
-#         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
+    instances = CustomerOutstanding.objects.filter(customer__pk=customer_pk,product_type=product_type)
+    if date:
+        date = datetime.strptime(date, '%Y-%m-%d').date()
+        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
 
-#     else:
-#         date = datetime.today().date()
-#         filter_data['filter_date'] = date.strftime('%Y-%m-%d')
+    else:
+        date = datetime.today().date()
+        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
     
-#     # if route_filter:
-#     #         instances = instances.filter(customer__routes__route_name=route_filter)
-#     # route_li = RouteMaster.objects.all()
+    # if route_filter:
+    #         instances = instances.filter(customer__routes__route_name=route_filter)
+    # route_li = RouteMaster.objects.all()
     
-#     if query:
+    if query:
 
-#         instances = instances.filter(
-#             Q(product_type__icontains=query) |
-#             Q(invoice_no__icontains=query) 
-#         )
-#         title = "Outstanding List - %s" % query
-#         filter_data['q'] = query
+        instances = instances.filter(
+            Q(product_type__icontains=query) |
+            Q(invoice_no__icontains=query) 
+        )
+        title = "Outstanding List - %s" % query
+        filter_data['q'] = query
     
-#     context = {
-#         'instances': instances.order_by("-created_date"),
-#         'page_name' : 'Customer Outstanding List',
-#         'page_title' : 'Customer Outstanding List',
-#         'customer_pk': customer_pk,
+    context = {
+        'instances': instances.order_by("-created_date"),
+        'page_name' : 'Customer Outstanding List',
+        'page_title' : 'Customer Outstanding List',
+        'customer_pk': customer_pk,
         
-#         'is_customer_outstanding': True,
-#         'is_need_datetime_picker': True,
-#         'filter_data': filter_data,
-#     }
-
-#     return render(request, 'client_management/customer_outstanding/info_list.html', context)
-
-
-@login_required
-def customer_outstanding_details(request, customer_pk):
-
-    filter_data = {}
-    query = request.GET.get("q", "")
-    date = request.GET.get("date")
-    product_type = request.GET.get("product_type", "amount")
-    filter_data["product_type"] = product_type
-
-    customer = get_object_or_404(Customers, pk=customer_pk)
-
-    # Only NON-PAID invoices
-    invoices = Invoice.objects.filter(
-        customer=customer,
-        invoice_status="non_paid",
-        is_deleted=False
-    ).exclude(amout_total=0)
-
-    # Search filter
-    if query:
-        invoices = invoices.filter(
-            Q(invoice_no__icontains=query) |
-            Q(reference_no__icontains=query)
-        )
-        filter_data["q"] = query
-
-    # Date filter
-    if date:
-        date_obj = datetime.strptime(date, "%Y-%m-%d").date()
-        invoices = invoices.filter(created_date__date__lte=date_obj)
-        filter_data["filter_date"] = date
-    else:
-        today = datetime.today().date()
-        filter_data["filter_date"] = today.strftime("%Y-%m-%d")
-    print("\n---------------- Customer Outstanding Details Debug ----------------")
-    print(f"Customer: {customer.customer_name} (ID: {customer.pk})")
-    print("-------------------------------------------------------------------")
-    invoice_list = []
-    total_outstanding = 0
-
-    for inv in invoices:
-        paid = inv.amout_recieved
-        balance = inv.amout_total - inv.amout_recieved
-        print(f"Invoice: {inv.invoice_no} | Total: {inv.amout_total} | Paid: {paid} | Balance: {balance}")
-        # ✔ NO CustomerOutstanding model used here
-        invoice_list.append({
-            "created_date": inv.created_date,
-            "invoice_no": inv.invoice_no,
-            "customer": inv.customer.customer_name,
-            "building_no": inv.customer.building_name,
-            "route": inv.customer.routes.route_name if inv.customer.routes else "",
-            "outstanding_type": product_type,
-            "amount": balance,          # ✔ correct unpaid amount
-            "pk": inv.pk,
-            "outstanding_pk": None      # ❌ REMOVE manual outstanding entries
-        })
-
-        total_outstanding += balance
-
-    context = {
-        "instances": invoice_list,
-        "customer_pk": customer_pk,
-        "filter_data": filter_data,
-        "total_outstanding": total_outstanding,
-    }
-
-    return render(request, "client_management/customer_outstanding/info_list.html", context)
-
-
-@login_required
-def customer_outstanding_view(request, customer_pk):
-    filter_data = {}
-    query = request.GET.get("q")
-    date = request.GET.get('date')
-    route_filter = request.GET.get('route_name')
-    product_type = request.GET.get('product_type', 'amount')
-    filter_data['product_type'] = product_type
-
-    customer_details = get_object_or_404(Customers, pk=customer_pk)
-
-    instances = CustomerOutstanding.objects.filter(
-        customer__pk=customer_pk,
-        product_type=product_type
-    )
-
-    if date:
-        date = datetime.strptime(date, '%Y-%m-%d').date()
-        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-    else:
-        date = datetime.today().date()
-        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-
-    if query:
-        instances = instances.filter(
-            Q(product_type__icontains=query) |
-            Q(invoice_no__icontains=query)
-        )
-        filter_data['q'] = query
-
-    invoice_queryset = OutstandingAmount.objects.filter(
-        customer_outstanding__in=instances
-    )
-
-    invoices = []
-    sl_no = 1
-    total_amount = 0
-    total_paid = 0
-    total_balance = 0
-
-    for invoice_data in invoice_queryset:
-        amount = invoice_data.amount or 0
-        customer_outstanding = invoice_data.customer_outstanding
-        invoice_no = customer_outstanding.invoice_no
-
-        invoice_obj = Invoice.objects.filter(
-            invoice_no=invoice_no,
-            customer=customer_details,
-            is_deleted=False
-        ).first()
-
-        if invoice_obj:
-            paid = CollectionItems.objects.filter(
-                invoice=invoice_obj
-            ).aggregate(total=Sum('amount_received'))['total'] or 0
-        else:
-            paid = 0
-
-        balance = amount - paid
-
-        days_passed = (
-            timezone.now().date() - customer_outstanding.created_date.date()
-        ).days if customer_outstanding.created_date else None
-
-        invoices.append({
-            'sl_no': sl_no,
-            'invoice_number': invoice_no,
-            'invoice_date': customer_outstanding.created_date,
-            'amount': amount,
-            'paid': paid,
-            'balance': balance,
-            'days_passed': days_passed,
-        })
-
-        total_amount += amount
-        total_paid += paid
-        total_balance += balance
-        sl_no += 1
-
-    route_name = customer_details.routes.route_name if customer_details.routes else ''
-
-    context = {
-        'customer_details': customer_details,
-        'invoices': invoices,
-        'route_name': route_name,
-        'customer_pk': customer_pk,
+        'is_customer_outstanding': True,
+        'is_need_datetime_picker': True,
         'filter_data': filter_data,
-        'customer_name': customer_details.customer_name,
-        'customer_id': customer_details.custom_id,
-        'mobile_no': customer_details.mobile_no,
-        'total_amount': total_amount,
-        'total_paid': total_paid,
-        'total_balance': total_balance,
     }
 
-    return render(
-        request,
-        'client_management/customer_outstanding/customer_outstanding_view.html',
-        context
-    )
-    
-    
-@login_required
-def customer_outstanding_print(request, customer_pk):
-    filter_data = {}
-    query = request.GET.get("q")
-    date = request.GET.get('date')
-    route_filter = request.GET.get('route_name')
-    product_type = request.GET.get('product_type', 'amount')
-    filter_data['product_type'] = product_type
-
-    customer_details = get_object_or_404(Customers, pk=customer_pk)
-
-    instances = CustomerOutstanding.objects.filter(
-        customer__pk=customer_pk,
-        product_type=product_type
-    )
-
-    if date:
-        date = datetime.strptime(date, '%Y-%m-%d').date()
-        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-    else:
-        date = datetime.today().date()
-        filter_data['filter_date'] = date.strftime('%Y-%m-%d')
-
-    if query:
-        instances = instances.filter(
-            Q(product_type__icontains=query) |
-            Q(invoice_no__icontains=query)
-        )
-        filter_data['q'] = query
-
-    invoice_queryset = OutstandingAmount.objects.filter(
-        customer_outstanding__in=instances
-    )
-
-    invoices = []
-    sl_no = 1
-    total_amount = 0
-    total_paid = 0
-    total_balance = 0
-
-    for invoice_data in invoice_queryset:
-        amount = invoice_data.amount or 0
-        customer_outstanding = invoice_data.customer_outstanding
-        invoice_no = customer_outstanding.invoice_no
-
-        invoice_obj = Invoice.objects.filter(
-            invoice_no=invoice_no,
-            customer=customer_details,
-            is_deleted=False
-        ).first()
-
-        if invoice_obj:
-            paid = CollectionItems.objects.filter(
-                invoice=invoice_obj
-            ).aggregate(total=Sum('amount_received'))['total'] or 0
-        else:
-            paid = 0
-
-        balance = amount - paid
-
-        days_passed = (
-            timezone.now().date() - customer_outstanding.created_date.date()
-        ).days if customer_outstanding.created_date else None
-
-        invoices.append({
-            'sl_no': sl_no,
-            'invoice_number': invoice_no,
-            'invoice_date': customer_outstanding.created_date,
-            'amount': amount,
-            'paid': paid,
-            'balance': balance,
-            'days_passed': days_passed,
-        })
-
-        total_amount += amount
-        total_paid += paid
-        total_balance += balance
-        sl_no += 1
-
-    route_name = customer_details.routes.route_name if customer_details.routes else ''
-
-    context = {
-        'customer_details': customer_details,
-        'invoices': invoices,
-        'route_name': route_name,
-        'customer_pk': customer_pk,
-        'filter_data': filter_data,
-        'customer_name': customer_details.customer_name,
-        'customer_id': customer_details.custom_id,
-        'mobile_no': customer_details.mobile_no,
-        'product_type': product_type,
-        'date': date.strftime('%Y-%m-%d'),
-        'total_amount': total_amount,
-        'total_paid': total_paid,
-        'total_balance': total_balance,
-    }
-
-    return render(
-        request,
-        'client_management/customer_outstanding/customer_outstanding_view_print.html',
-        context
-    )
-    
-    
+    return render(request, 'client_management/customer_outstanding/info_list.html', context)
 
 @login_required
 def outstanding_list(request):
@@ -3811,7 +3332,7 @@ def create_customer_outstanding(request):
                         outstanding_data.save()
                         
                         if outstanding_amount.customer_outstanding.customer.sales_type == "CREDIT":
-                            invoice.invoice_type = "credit_invoice"
+                            invoice.invoice_type = "credit_invoive"
                             invoice.save()
 
                         # Create invoice items

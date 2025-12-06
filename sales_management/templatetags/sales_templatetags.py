@@ -120,11 +120,8 @@ def get_sales_report(route_id, start_date, end_date):
 
     net_paid = cash_sales + credit_sales + coupon_sales + credit_collection - total_expense
     
-    sales_quantity = cash_sales_qnty + credit_sales_qnty + coupon_sales_qnty
-    
     return {
-        # "sales_quantity": sales_quantity - foc_sales,
-        "sales_quantity": sales_quantity,
+        "sales_quantity": sales_quantity - foc_sales,
         "avg_price": avg_price,
         "cash_sales_qnty":cash_sales_qnty,
         "cash_sales": cash_sales,

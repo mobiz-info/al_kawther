@@ -33,7 +33,7 @@ class Command(BaseCommand):
                     amout_total=oustanding.get_outstanding_count(),
                     amout_recieved=0,
                     customer=oustanding.customer,
-                    invoice_type = "credit_invoice",
+                    invoice_type = "credit_invoive",
                     reference_no=f"custom_id{oustanding.customer.custom_id}"
                 )
                 
@@ -111,7 +111,7 @@ class Command(BaseCommand):
             # oustanding.save()
             
             # if oustanding.customer.sales_type == "CREDIT":
-            #     invoice.invoice_type = "credit_invoice"
+            #     invoice.invoice_type = "credit_invoive"
             #     invoice.save()
 
             # # Create invoice items

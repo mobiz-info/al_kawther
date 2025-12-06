@@ -2367,98 +2367,6 @@ class Get_Items_API(APIView):
     #         print(e)
     #         return Response({'status': False, 'message': 'Something went wrong!'})
 
-# class Add_Customer_Custody_Item_API(APIView):
-#     authentication_classes = [BasicAuthentication]
-#     permission_classes = [IsAuthenticated]
-#     def post(self, request, *args, **kwargs):
-#         try:
-#             user = CustomUser.objects.get(username=request.user.username)
-#             data = request.data.get('data_list', {})
-#             customer_id = data.get('customer_id')
-#             agreement_no = data.get('agreement_no')
-#             total_amount = data.get('total_amount')
-#             deposit_type = data.get('deposit_type')
-#             reference_no = data.get('reference_no')
-#             amount_collected = data.get('amount_collected')
-#             product_id = data.get('product')
-#             quantity = data.get('quantity')
-#             serialnumber = data.get('serialnumber')
-#             amount = data.get('amount')
-#             can_deposite_chrge = data.get('can_deposite_chrge')
-#             five_gallon_water_charge = data.get('five_gallon_water_charge')
-
-#             with transaction.atomic():
-#                 # Create CustodyCustom instance
-#                 custody_data = CustodyCustom.objects.create(
-#                     customer=Customers.objects.get(pk=customer_id),
-#                     agreement_no=agreement_no,
-#                     total_amount=total_amount,
-#                     deposit_type=deposit_type,
-#                     reference_no=reference_no,
-#                     amount_collected=amount_collected,
-#                     created_by=user.pk,
-#                     created_date=datetime.today(),
-#                 )
-
-#                 # Create CustodyCustomItems instance
-#                 product_instance = ProdutItemMaster.objects.get(pk=product_id)
-#                 custody_item_data = {
-#                     "custody_custom": custody_data,
-#                     "product": product_instance,
-#                     "quantity": quantity,
-#                     "serialnumber": serialnumber,
-#                     "amount": amount,
-#                     "can_deposite_chrge": can_deposite_chrge,
-#                     "five_gallon_water_charge": five_gallon_water_charge,
-#                 }
-#                 item_instance = CustodyCustomItems.objects.create(**custody_item_data)
-
-#                 # Update bottle count if necessary
-#                 if product_instance.product_name == "5 Gallon":
-#                     bottle_count, created = BottleCount.objects.get_or_create(
-#                         van__salesman=request.user,
-#                         created_date__date=custody_data.created_date.date(),
-#                         defaults={'custody_issue': quantity}
-#                     )
-#                     if not created:
-#                         bottle_count.custody_issue += quantity
-#                         bottle_count.save()
-
-#                 # Update or create CustomerCustodyStock
-#                 if CustomerCustodyStock.objects.filter(customer=custody_data.customer, product=product_instance).exists():
-#                     stock_instance = CustomerCustodyStock.objects.get(customer=custody_data.customer, product=product_instance)
-#                     stock_instance.quantity += quantity
-#                     stock_instance.serialnumber = (stock_instance.serialnumber + ',' + serialnumber) if stock_instance.serialnumber else serialnumber
-#                     stock_instance.agreement_no = (stock_instance.agreement_no + ',' + agreement_no) if stock_instance.agreement_no else agreement_no
-#                     stock_instance.save()
-#                 else:
-#                     CustomerCustodyStock.objects.create(
-#                         customer=custody_data.customer,
-#                         agreement_no=agreement_no,
-#                         deposit_type=deposit_type,
-#                         reference_no=reference_no,
-#                         product=product_instance,
-#                         quantity=quantity,
-#                         serialnumber=serialnumber,
-#                         amount=amount,
-#                         can_deposite_chrge=can_deposite_chrge,
-#                         five_gallon_water_charge=five_gallon_water_charge,
-#                         amount_collected=amount_collected
-#                     )
-
-#                 log_activity(
-#                     created_by=user,
-#                     description=f"Created custody item for customer {customer_id}"
-#                 )
-                
-#                 return Response({'status': True, 'message': 'Customer Custody Item Successfully Created'}, status=status.HTTP_201_CREATED)
-
-#         except Exception as e:
-#             log_activity(
-#                 created_by=request.user,
-#                 description=f"Error creating custody item for customer {customer_id} - {str(e)}"
-#             )
-#             return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class Add_Customer_Custody_Item_API(APIView):
     authentication_classes = [BasicAuthentication]
     permission_classes = [IsAuthenticated]
@@ -2492,8 +2400,6 @@ class Add_Customer_Custody_Item_API(APIView):
                     created_date=datetime.today(),
                 )
 
-
-
                 # Create CustodyCustomItems instance
                 product_instance = ProdutItemMaster.objects.get(pk=product_id)
                 custody_item_data = {
@@ -2506,23 +2412,11 @@ class Add_Customer_Custody_Item_API(APIView):
                     "five_gallon_water_charge": five_gallon_water_charge,
                 }
                 item_instance = CustodyCustomItems.objects.create(**custody_item_data)
-                
-                customer_instance = custody_data.customer
-                customer_instance.no_of_bottles_required = (
-                    (customer_instance.no_of_bottles_required or 0) + int(quantity or 0)
-                )
-                customer_instance.save(update_fields=["no_of_bottles_required"])
 
                 # Update bottle count if necessary
                 if product_instance.product_name == "5 Gallon":
-                    van = Van.objects.filter(salesman=request.user).first()
-                    if not van:
-                        return Response({
-                            "status": False,
-                            "message": "This salesman is not mapped with any van."
-                        }, status=400)
                     bottle_count, created = BottleCount.objects.get_or_create(
-                        van=van,
+                        van__salesman=request.user,
                         created_date__date=custody_data.created_date.date(),
                         defaults={'custody_issue': quantity}
                     )
@@ -2552,39 +2446,6 @@ class Add_Customer_Custody_Item_API(APIView):
                         amount_collected=amount_collected
                     )
 
-                # create invoice 
-                invoice = Invoice.objects.create (                   
-                    created_date= datetime.today(),
-                    net_taxable=Decimal("0"),
-                    vat=Decimal("0"),
-                    discount=Decimal("0"),
-                    amout_total=Decimal(str(data.get('total_amount') or 0)),
-                    amout_recieved=Decimal(str(data.get('amount_collected') or 0)),
-                    customer=Customers.objects.get(pk=customer_id),
-                    reference_no= 0
-                )
-
-                if invoice.amout_recieved == invoice.amout_total:
-                    invoice.invoice_status = "paid"
-                else:
-                    invoice.invoice_status = "non_paid"
-
-                if invoice.amout_recieved == 0:
-                    invoice.invoice_type = "credit_invoice"        
-                else:
-                    invoice.invoice_type = "cash_invoice"
-
-                print("Invoice status:",invoice.invoice_status)
-                print("Invoice Type:",invoice.invoice_type)
-
-                invoice.save()
-
-                create_outstanding_for_new_invoice(
-                    invoice=invoice,
-                    customer=Customers.objects.get(pk=customer_id),
-                    created_by=request.user.id
-                )
-
                 log_activity(
                     created_by=user,
                     description=f"Created custody item for customer {customer_id}"
@@ -2593,14 +2454,12 @@ class Add_Customer_Custody_Item_API(APIView):
                 return Response({'status': True, 'message': 'Customer Custody Item Successfully Created'}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            print("eror in creating custody",e)
             log_activity(
                 created_by=request.user,
                 description=f"Error creating custody item for customer {customer_id} - {str(e)}"
             )
             return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        
+
     def get(self,request,id=None):
         try:
             customer_exists = Customers.objects.filter(is_guest=False, customer_id=id).exists()
@@ -3394,7 +3253,6 @@ def delete_coupon_recharge(request,invoice_no):
     except Exception as e:
         return {"status": "error", "message": f"An error occurred: {str(e)}"}
 
-
 class CustomerCouponRecharge(APIView):
     def post(self, request, *args, **kwargs):
         try:
@@ -3420,34 +3278,34 @@ class CustomerCouponRecharge(APIView):
                     )
                     coupon_instances.append(customer_coupon)
                     
-                    balance_amount = Decimal(coupon_data.pop("balance"))
+                    balance_amount = int(coupon_data.pop("balance"))
                     coupon_method = coupon_data.pop("coupon_method")
                     
-                    # if balance_amount != 0 :
+                    if balance_amount != 0 :
                         
-                    #     customer_outstanding = CustomerOutstanding.objects.create(
-                    #         customer=customer,
-                    #         product_type="amount",
-                    #         created_by=request.user.id,
-                    #         created_date=datetime.today(),
-                    #     )
+                        customer_outstanding = CustomerOutstanding.objects.create(
+                            customer=customer,
+                            product_type="amount",
+                            created_by=request.user.id,
+                            created_date=datetime.today(),
+                        )
 
-                    #     outstanding_amount = OutstandingAmount.objects.create(
-                    #         amount=balance_amount,
-                    #         customer_outstanding=customer_outstanding,
-                    #     )
-                    #     outstanding_instance = ""
+                        outstanding_amount = OutstandingAmount.objects.create(
+                            amount=balance_amount,
+                            customer_outstanding=customer_outstanding,
+                        )
+                        outstanding_instance = ""
 
-                    #     try:
-                    #         outstanding_instance=CustomerOutstandingReport.objects.get(customer=customer,product_type="amount")
-                    #         outstanding_instance.value += Decimal(outstanding_amount.amount)
-                    #         outstanding_instance.save()
-                    #     except:
-                    #         outstanding_instance = CustomerOutstandingReport.objects.create(
-                    #             product_type='amount',
-                    #             value=outstanding_amount.amount,
-                    #             customer=outstanding_amount.customer_outstanding.customer
-                    #         )
+                        try:
+                            outstanding_instance=CustomerOutstandingReport.objects.get(customer=customer,product_type="amount")
+                            outstanding_instance.value += Decimal(outstanding_amount.amount)
+                            outstanding_instance.save()
+                        except:
+                            outstanding_instance = CustomerOutstandingReport.objects.create(
+                                product_type='amount',
+                                value=outstanding_amount.amount,
+                                customer=outstanding_amount.customer_outstanding.customer
+                            )
                     log_activity(
                         created_by=request.user,
                         description=f"Created outstanding for customer {customer.customer_name}, amount: {balance_amount}"
@@ -3534,10 +3392,8 @@ class CustomerCouponRecharge(APIView):
                     #     invoice_number = f'WTR-{date_part}-{random_part}'
 
                     # Create the invoice
-
-                     
-
                     invoice_instance = Invoice.objects.create(
+                        # invoice_no=generate_invoice_no(customer_coupon.created_date.date()),
                         created_date=datetime.today(),
                         net_taxable=customer_coupon.net_amount,
                         discount=customer_coupon.discount,
@@ -3550,26 +3406,11 @@ class CustomerCouponRecharge(APIView):
                     customer_coupon.invoice_no = invoice_instance.invoice_no
                     customer_coupon.save()
                     
-                    if invoice_instance.amout_recieved == invoice_instance.amout_total:
+                    if invoice_instance.amout_total == invoice_instance.amout_recieved:
                         invoice_instance.invoice_status = "paid"
                     else:
                         invoice_instance.invoice_status = "non_paid"
-
-                    if invoice_instance.amout_recieved == 0:
-                        invoice_instance.invoice_type = "credit_invoice"        
-                    else:
-                        invoice_instance.invoice_type = "cash_invoice"
-
-                    print("Invoice status:",invoice_instance.invoice_status)
-                    print("Invoice Type:",invoice_instance.invoice_type)
-
                     invoice_instance.save()
-
-                    create_outstanding_for_new_invoice(
-                        invoice=invoice_instance,
-                        customer=customer_coupon.customer,
-                        created_by=request.user.id
-                    )
                     
                     coupon_items = CustomerCouponItems.objects.filter(customer_coupon=customer_coupon) 
                     
@@ -3602,9 +3443,9 @@ class CustomerCouponRecharge(APIView):
                         transaction_type='coupon_rechange',
                         instance_id=str(customer_coupon.id),  
                         amount_received=customer_coupon.amount_recieved,
-                        receipt_number=generate_receipt_no(datetime.today().date()),
                         invoice_number=",".join(invoice_numbers),
-                        customer=customer_coupon.customer
+                        customer=customer_coupon.customer,
+                        created_date=datetime.today().now(),
                     )
 
                 # Create ChequeCouponPayment instanceno_of_leaflets
@@ -3620,7 +3461,6 @@ class CustomerCouponRecharge(APIView):
                 return Response({"message": "Recharge successful"}, status=status.HTTP_200_OK)
 
         except IntegrityError as e:
-            print("Eror in coupon recharge:",e)
             log_activity(
                 created_by=request.user.id,
                 description=f"Failed to process recharge: IntegrityError - {str(e)}"
@@ -3634,7 +3474,6 @@ class CustomerCouponRecharge(APIView):
             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         except Exception as e:
-            print("Exeption in coupon recharge:",e)
             # Handle other exceptions
             response_data = {
                 "status": "false",
@@ -3643,329 +3482,100 @@ class CustomerCouponRecharge(APIView):
             }
             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-# class CustomerCouponRecharge(APIView):
-#     def post(self, request, *args, **kwargs):
-#         try:
-#             with transaction.atomic():
-#                 coupons_data = request.data.get('coupons', [])
-#                 payment_data = request.data.get('payment', {})
+    def delete(self, request, pk):
+        """
+        API endpoint to delete a customer coupon recharge and rollback transactions.
+        """
+        try:
+            with transaction.atomic():
+                customer_coupon = CustomerCoupon.objects.get(pk=pk)
 
-#                 coupon_instances = []
-#                 for coupon_data in coupons_data:
-#                     customer = Customers.objects.get(pk=coupon_data.pop("customer"))
-#                     salesman = CustomUser.objects.get(pk=coupon_data.pop("salesman"))
-#                     items_data = coupon_data.pop('items', [])
-                    
-#                     customer_coupon = CustomerCoupon.objects.create(
-#                         customer=customer,
-#                         salesman=salesman,
-#                         created_date=datetime.today(),
-#                         **coupon_data
-#                         )
-#                     log_activity(
-#                         created_by=request.user,
-#                         description=f"Created customer coupon for {customer.customer_name}, reference number: {customer_coupon.reference_number}"
-#                     )
-#                     coupon_instances.append(customer_coupon)
-                    
-#                     balance_amount = int(coupon_data.pop("balance"))
-#                     coupon_method = coupon_data.pop("coupon_method")
-                    
-#                     if balance_amount != 0 :
-                        
-#                         customer_outstanding = CustomerOutstanding.objects.create(
-#                             customer=customer,
-#                             product_type="amount",
-#                             created_by=request.user.id,
-#                             created_date=datetime.today(),
-#                         )
+                # Rollback Outstanding
+                try:
+                    if customer_coupon.balance > 0:
+                        outstanding_report = CustomerOutstandingReport.objects.get(
+                            customer=customer_coupon.customer,
+                            product_type="amount"
+                        )
+                        outstanding_report.value -= Decimal(customer_coupon.balance)
+                        outstanding_report.save()
 
-#                         outstanding_amount = OutstandingAmount.objects.create(
-#                             amount=balance_amount,
-#                             customer_outstanding=customer_outstanding,
-#                         )
-#                         outstanding_instance = ""
+                        # delete linked outstanding and amounts
+                        CustomerOutstanding.objects.filter(
+                            customer=customer_coupon.customer,
+                            product_type="amount"
+                        ).delete()
+                except CustomerOutstandingReport.DoesNotExist:
+                    pass
 
-#                         try:
-#                             outstanding_instance=CustomerOutstandingReport.objects.get(customer=customer,product_type="amount")
-#                             outstanding_instance.value += Decimal(outstanding_amount.amount)
-#                             outstanding_instance.save()
-#                         except:
-#                             outstanding_instance = CustomerOutstandingReport.objects.create(
-#                                 product_type='amount',
-#                                 value=outstanding_amount.amount,
-#                                 customer=outstanding_amount.customer_outstanding.customer
-#                             )
-#                     log_activity(
-#                         created_by=request.user,
-#                         description=f"Created outstanding for customer {customer.customer_name}, amount: {balance_amount}"
-#                     )
-#                     # Create CustomerCouponItems instances
-#                     if coupon_method == "manual":
-                        
-#                         for item_data in items_data:
-#                             coupon = NewCoupon.objects.get(pk=item_data.pop("coupon"))
-#                             items = CustomerCouponItems.objects.create(
-#                                 customer_coupon=customer_coupon,
-#                                 coupon=coupon,
-#                                 rate=item_data.pop("rate")
-#                             )
-#                             log_activity(
-#                                 created_by=request.user,
-#                                 description=f"Added coupon item for customer {customer.customer_name}, coupon: {coupon.book_num}"
-#                             )
-#                             # Update CustomerCouponStock based on coupons
-#                             for coupon_instance in coupon_instances:
-#                                 coupon_method = coupon.coupon_method
-#                                 customer_id = customer
-#                                 coupon_type_id = CouponType.objects.get(pk=coupon.coupon_type_id)
+                # Rollback Coupon Items & Stocks
+                coupon_items = CustomerCouponItems.objects.filter(customer_coupon=customer_coupon)
+                for item in coupon_items:
+                    coupon = item.coupon
+                    # rollback CustomerCouponStock
+                    try:
+                        stock = CustomerCouponStock.objects.get(
+                            coupon_method=coupon.coupon_method,
+                            customer_id=customer_coupon.customer.pk,
+                            coupon_type_id=coupon.coupon_type_id
+                        )
+                        stock.count -= Decimal(coupon.no_of_leaflets)
+                        stock.save()
+                    except CustomerCouponStock.DoesNotExist:
+                        pass
 
-#                                 try:
-#                                     customer_coupon_stock = CustomerCouponStock.objects.get(
-#                                         coupon_method=coupon_method,
-#                                         customer_id=customer_id.pk,
-#                                         coupon_type_id=coupon_type_id
-#                                     )
-#                                 except CustomerCouponStock.DoesNotExist:
-#                                     customer_coupon_stock = CustomerCouponStock.objects.create(
-#                                         coupon_method=coupon_method,
-#                                         customer_id=customer_id.pk,
-#                                         coupon_type_id=coupon_type_id,
-#                                         count=0
-#                                     )
+                    # rollback VanCouponStock
+                    try:
+                        van_stock = VanCouponStock.objects.get(
+                            created_date=customer_coupon.created_date.date(),
+                            coupon=coupon
+                        )
+                        van_stock.stock += 1
+                        van_stock.sold_count -= 1
+                        van_stock.save()
+                    except VanCouponStock.DoesNotExist:
+                        pass
 
-#                                 customer_coupon_stock.count += Decimal(coupon.no_of_leaflets)
-#                                 customer_coupon_stock.save()
-                                
-#                                 van_coupon_stock = VanCouponStock.objects.get(created_date=datetime.today().date(),coupon=coupon)
-#                                 van_coupon_stock.stock -= 1
-#                                 van_coupon_stock.sold_count += 1
-#                                 van_coupon_stock.save()
-                                
-#                             CouponStock.objects.filter(couponbook=coupon).update(coupon_stock="customer")
-                                
-#                     elif coupon_method == "digital":
-#                         digital_coupon_data = request.data.get('digital_coupon', {})
-#                         try:
-#                             customer_coupon_stock = CustomerCouponStock.objects.get(
-#                                 coupon_method=coupon_method,
-#                                 customer_id=customer.pk,
-#                                 coupon_type_id=CouponType.objects.get(coupon_type_name="Digital")
-#                             )
-#                         except CustomerCouponStock.DoesNotExist:
-#                             customer_coupon_stock = CustomerCouponStock.objects.create(
-#                                 coupon_method=coupon_method,
-#                                 customer_id=customer.pk,
-#                                 coupon_type_id=CouponType.objects.get(coupon_type_name="Digital"),
-#                                 count=0
-#                             )
-#                         customer_coupon_stock.count += digital_coupon_data.get("count")
-#                         customer_coupon_stock.save()
-                    
-#                     date_part = timezone.now().strftime('%Y%m%d')
-#                     # try:
-#                     #     invoice_last_no = Invoice.objects.filter(is_deleted=False).latest('created_date')
-#                     #     last_invoice_number = invoice_last_no.invoice_no
+                    # reset coupon stock status
+                    CouponStock.objects.filter(couponbook=coupon).update(coupon_stock="van")
 
-#                     #     # Validate the format of the last invoice number
-#                     #     parts = last_invoice_number.split('-')
-#                     #     if len(parts) == 3 and parts[0] == 'WTR' and parts[1] == date_part:
-#                     #         prefix, old_date_part, number_part = parts
-#                     #         new_number_part = int(number_part) + 1
-#                     #         invoice_number = f'{prefix}-{date_part}-{new_number_part:04d}'
-#                     #     else:
-#                     #         # If the last invoice number is not in the expected format, generate a new one
-#                     #         random_part = str(random.randint(1000, 9999))
-#                     #         invoice_number = f'WTR-{date_part}-{random_part}'
-#                     # except Invoice.DoesNotExist:
-#                     #     random_part = str(random.randint(1000, 9999))
-#                     #     invoice_number = f'WTR-{date_part}-{random_part}'
+                coupon_items.delete()
 
-#                     # Create the invoice
-#                     invoice_instance = Invoice.objects.create(
-#                         # invoice_no=generate_invoice_no(customer_coupon.created_date.date()),
-#                         created_date=datetime.today(),
-#                         net_taxable=customer_coupon.net_amount,
-#                         discount=customer_coupon.discount,
-#                         amout_total=customer_coupon.total_payeble,
-#                         amout_recieved=customer_coupon.amount_recieved,
-#                         customer=customer_coupon.customer,
-#                         reference_no=customer_coupon.reference_number
-#                     )
-                    
-#                     customer_coupon.invoice_no = invoice_instance.invoice_no
-#                     customer_coupon.save()
-                    
-#                     if invoice_instance.amout_total == invoice_instance.amout_recieved:
-#                         invoice_instance.invoice_status = "paid"
-#                     else:
-#                         invoice_instance.invoice_status = "non_paid"
-#                     invoice_instance.save()
-                    
-#                     coupon_items = CustomerCouponItems.objects.filter(customer_coupon=customer_coupon) 
-                    
-#                     # Create invoice items
-#                     for item_data in coupon_items:
-#                         category = CategoryMaster.objects.get(category_name__iexact="coupons")
-#                         product_item = ProdutItemMaster.objects.get(product_name=item_data.coupon.coupon_type.coupon_type_name)
-#                         # print(product_item)
-#                         InvoiceItems.objects.create(
-#                             category=category,
-#                             product_items=product_item,
-#                             qty=1,
-#                             rate=product_item.rate,
-#                             invoice=invoice_instance,
-#                             remarks='invoice genereted from recharge coupon items reference no : ' + invoice_instance.reference_no
-#                         )
-                        
-#                     InvoiceDailyCollection.objects.create(
-#                         invoice=invoice_instance,
-#                         created_date=datetime.today(),
-#                         customer=invoice_instance.customer,
-#                         salesman=request.user,
-#                         amount=invoice_instance.amout_recieved,
-#                     ) 
-                    
-#                     invoice_numbers = []
-#                     invoice_numbers.append(invoice_instance.invoice_no)
-                    
-#                     receipt = Receipt.objects.create(
-#                         transaction_type='coupon_rechange',
-#                         instance_id=str(customer_coupon.id),  
-#                         amount_received=customer_coupon.amount_recieved,
-#                         invoice_number=",".join(invoice_numbers),
-#                         customer=customer_coupon.customer,
-#                         created_date=datetime.today().now(),
-#                     )
+                # Rollback Invoice
+                if customer_coupon.invoice_no:
+                    try:
+                        invoice = Invoice.objects.get(invoice_no=customer_coupon.invoice_no)
+                        InvoiceItems.objects.filter(invoice=invoice).delete()
+                        InvoiceDailyCollection.objects.filter(invoice=invoice).delete()
+                        invoice.delete()
+                    except Invoice.DoesNotExist:
+                        pass
 
-#                 # Create ChequeCouponPayment instanceno_of_leaflets
-#                 cheque_payment_instance = None
-#                 if coupon_data.pop("payment_type") == 'cheque':
-#                     cheque_payment_instance = ChequeCouponPayment.objects.create(**payment_data)
-                
-#                 log_activity(
-#                         created_by=request.user,
-#                         description=f"Created invoice {invoice_instance.invoice_no} for customer {customer.customer_name}"
-#                     )
-                
-#                 return Response({"message": "Recharge successful"}, status=status.HTTP_200_OK)
+                # Rollback Receipt
+                Receipt.objects.filter(instance_id=str(customer_coupon.id)).delete()
 
-#         except IntegrityError as e:
-#             log_activity(
-#                 created_by=request.user.id,
-#                 description=f"Failed to process recharge: IntegrityError - {str(e)}"
-#             )
-#             # Handle database integrity error
-#             response_data = {
-#                 "status": "false",
-#                 "title": "Failed",
-#                 "message": str(e),
-#             }
-#             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # Rollback Cheque Payment
+                ChequeCouponPayment.objects.filter(reference_number=customer_coupon.reference_number).delete()
 
-#         except Exception as e:
-#             # Handle other exceptions
-#             response_data = {
-#                 "status": "false",
-#                 "title": "Failed",
-#                 "message": str(e),
-#             }
-#             return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # Finally delete CustomerCoupon
+                reference_no = customer_coupon.reference_number
+                customer_coupon.delete()
 
-#     def delete(self, request, pk):
-#         """
-#         API endpoint to delete a customer coupon recharge and rollback transactions.
-#         """
-#         try:
-#             with transaction.atomic():
-#                 customer_coupon = CustomerCoupon.objects.get(pk=pk)
+                log_activity(
+                    created_by=request.user,
+                    description=f"Rolled back customer coupon recharge {reference_no}"
+                )
 
-#                 # Rollback Outstanding
-#                 try:
-#                     if customer_coupon.balance > 0:
-#                         outstanding_report = CustomerOutstandingReport.objects.get(
-#                             customer=customer_coupon.customer,
-#                             product_type="amount"
-#                         )
-#                         outstanding_report.value -= Decimal(customer_coupon.balance)
-#                         outstanding_report.save()
+                return Response(
+                    {"message": "Customer coupon recharge deleted and rolled back successfully."},
+                    status=status.HTTP_204_NO_CONTENT
+                )
 
-#                         # delete linked outstanding and amounts
-#                         CustomerOutstanding.objects.filter(
-#                             customer=customer_coupon.customer,
-#                             product_type="amount"
-#                         ).delete()
-#                 except CustomerOutstandingReport.DoesNotExist:
-#                     pass
+        except CustomerCoupon.DoesNotExist:
+            return Response({"message": "Customer coupon recharge not found."}, status=status.HTTP_404_NOT_FOUND)
 
-#                 # Rollback Coupon Items & Stocks
-#                 coupon_items = CustomerCouponItems.objects.filter(customer_coupon=customer_coupon)
-#                 for item in coupon_items:
-#                     coupon = item.coupon
-#                     # rollback CustomerCouponStock
-#                     try:
-#                         stock = CustomerCouponStock.objects.get(
-#                             coupon_method=coupon.coupon_method,
-#                             customer_id=customer_coupon.customer.pk,
-#                             coupon_type_id=coupon.coupon_type_id
-#                         )
-#                         stock.count -= Decimal(coupon.no_of_leaflets)
-#                         stock.save()
-#                     except CustomerCouponStock.DoesNotExist:
-#                         pass
-
-#                     # rollback VanCouponStock
-#                     try:
-#                         van_stock = VanCouponStock.objects.get(
-#                             created_date=customer_coupon.created_date.date(),
-#                             coupon=coupon
-#                         )
-#                         van_stock.stock += 1
-#                         van_stock.sold_count -= 1
-#                         van_stock.save()
-#                     except VanCouponStock.DoesNotExist:
-#                         pass
-
-#                     # reset coupon stock status
-#                     CouponStock.objects.filter(couponbook=coupon).update(coupon_stock="van")
-
-#                 coupon_items.delete()
-
-#                 # Rollback Invoice
-#                 if customer_coupon.invoice_no:
-#                     try:
-#                         invoice = Invoice.objects.get(invoice_no=customer_coupon.invoice_no)
-#                         InvoiceItems.objects.filter(invoice=invoice).delete()
-#                         InvoiceDailyCollection.objects.filter(invoice=invoice).delete()
-#                         invoice.delete()
-#                     except Invoice.DoesNotExist:
-#                         pass
-
-#                 # Rollback Receipt
-#                 Receipt.objects.filter(instance_id=str(customer_coupon.id)).delete()
-
-#                 # Rollback Cheque Payment
-#                 ChequeCouponPayment.objects.filter(reference_number=customer_coupon.reference_number).delete()
-
-#                 # Finally delete CustomerCoupon
-#                 reference_no = customer_coupon.reference_number
-#                 customer_coupon.delete()
-
-#                 log_activity(
-#                     created_by=request.user,
-#                     description=f"Rolled back customer coupon recharge {reference_no}"
-#                 )
-
-#                 return Response(
-#                     {"message": "Customer coupon recharge deleted and rolled back successfully."},
-#                     status=status.HTTP_204_NO_CONTENT
-#                 )
-
-#         except CustomerCoupon.DoesNotExist:
-#             return Response({"message": "Customer coupon recharge not found."}, status=status.HTTP_404_NOT_FOUND)
-
-#         except Exception as e:
-#             return Response({"message": f"Error during rollback: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"message": f"Error during rollback: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -4813,7 +4423,7 @@ class create_customer_supply(APIView):
                         customer_outstanding_amount.save()
                     
                     if customer_supply.customer.sales_type == "CREDIT":
-                        invoice.invoice_type = "credit_invoice"
+                        invoice.invoice_type = "credit_invoive"
                         invoice.save()
 
                     # Create invoice items
@@ -5471,7 +5081,7 @@ class edit_customer_supply(APIView):
                     customer_supply.save()
                     
                     if customer_supply.customer.sales_type == "CREDIT":
-                        invoice.invoice_type = "credit_invoice"
+                        invoice.invoice_type = "credit_invoive"
                         invoice.save()
 
                     # Create invoice items
@@ -5896,7 +5506,7 @@ class CustodyItemReturnAPI(APIView):
             # )
             
             # if customer.sales_type == "CREDIT":
-            #     invoice.invoice_type = "credit_invoice"
+            #     invoice.invoice_type = "credit_invoive"
             #     invoice.save()
 
             # # Create invoice items
@@ -6341,6 +5951,195 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+class AddCollectionPayment(APIView):
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            with transaction.atomic():
+                # Extract data from request
+                payment_method = request.data.get("payment_method")
+                amount_received = Decimal(request.data.get("amount_received", 0))
+                invoice_ids = request.data.get("invoice_ids", [])
+                customer_id = request.data.get("customer_id")
+                cheque_details = request.data.get("cheque_details", {})
+                card_details = request.data.get("card_details", {})
+                online_details = request.data.get("online_details", {}) 
+
+                if not invoice_ids:
+                    return Response({"message": "Invoice IDs are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+                try:
+                    customer = Customers.objects.get(pk=customer_id)
+                except Customers.DoesNotExist:
+                    return Response({"message": "Customer does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+                invoices = Invoice.objects.filter(pk__in=invoice_ids, customer=customer).order_by('created_date')
+
+                if not invoices.exists():
+                    return Response({"message": "No valid invoices found."}, status=status.HTTP_400_BAD_REQUEST)
+
+                invoice_numbers = []
+
+                collection_payment = CollectionPayment.objects.create(
+                    payment_method=payment_method,
+                    customer=customer,
+                    salesman=request.user,
+                    amount_received=amount_received,
+                    created_date=datetime.today().now()
+                )
+
+                if payment_method.lower() == "cheque":
+                    collection_cheque = CollectionCheque.objects.create(
+                        cheque_amount=amount_received,
+                        cheque_no=cheque_details.get("cheque_no"),
+                        bank_name=cheque_details.get("bank_name"),
+                        cheque_date=cheque_details.get("cheque_date"),
+                        collection_payment=collection_payment,
+                    )
+
+                    collection_cheque.invoices.set(invoices)
+
+                    response_data = {
+                        "status": "true",
+                        "title": "Successfully Created",
+                        "message": "Cheque payment saved successfully.",
+                        "redirect": "true",
+                        "redirect_url": f"/collections/{collection_payment.id}/details/",
+                        "collection_id": collection_payment.id,
+                        "receipt_number": None,
+                        "invoice_numbers": list(invoices.values_list("invoice_no", flat=True)),
+                        "payment_method": payment_method.upper(),
+                        "amount_received": str(amount_received),
+                    }
+                    return Response(response_data, status=status.HTTP_201_CREATED)
+
+                if payment_method.lower() == "cash" or payment_method.lower() == "card" or payment_method.lower() == "online":
+                    remaining_amount = Decimal(amount_received)
+
+                    for invoice in invoices:
+                        if invoice.amout_total > invoice.amout_recieved:
+                            invoice_numbers.append(invoice.invoice_no)
+                            due_amount = invoice.amout_total - invoice.amout_recieved
+                            payment_amount = min(due_amount, remaining_amount)
+
+                            invoice.amout_recieved += payment_amount
+                            invoice.save()
+
+                            CollectionItems.objects.create(
+                                invoice=invoice,
+                                amount=invoice.amout_total,
+                                balance=invoice.amout_total - invoice.amout_recieved,
+                                amount_received=payment_amount,
+                                collection_payment=collection_payment
+                            )
+
+                            if payment_method.lower() == "card":
+                                CollectionCard.objects.create(
+                                    collection_payment=collection_payment,
+                                    customer_name=card_details.get("customer_name"),
+                                    card_number=card_details.get("card_number"),
+                                    card_date=card_details.get("card_date"),
+                                    card_type=card_details.get("card_type"),
+                                    card_category=card_details.get("card_category"),
+                                    card_amount=amount_received
+                                )
+
+                            if payment_method.lower() == "online":
+                                CollectionOnline.objects.create(
+                                    collection_payment=collection_payment,
+                                    transaction_no=
+                                    online_details.get("transaction_no"),
+                                    transaction_date=online_details.get("transaction_date"),
+                                    online_amount=payment_amount,  
+                                    status=online_details.get("status", "PENDING")
+                                )
+                                
+                            # Adjust outstanding balance
+                            outstanding_instance, _ = CustomerOutstandingReport.objects.get_or_create(
+                                customer=customer, product_type="amount", defaults={"value": 0}
+                            )
+                            outstanding_instance.value -= payment_amount
+                            outstanding_instance.save()
+
+                            remaining_amount -= payment_amount
+
+                            if invoice.amout_recieved == invoice.amout_total:
+                                invoice.invoice_status = 'paid'
+                                invoice.save()
+
+                            log_activity(
+                                created_by=request.user,
+                                description=f"Invoice {invoice.invoice_no} partially/fully paid: {payment_amount} received, Remaining balance: {invoice.amout_total - invoice.amout_recieved}"
+                            )
+
+                        if remaining_amount <= 0:
+                            break
+
+                    receipt = Receipt.objects.create(
+                        transaction_type="collection",
+                        instance_id=str(collection_payment.id),
+                        amount_received=amount_received,
+                        customer=customer,
+                        invoice_number=",".join(invoice_numbers),
+                        created_date=datetime.today().now()
+                    )
+
+                    collection_payment.receipt_number = receipt.receipt_number
+                    collection_payment.save()
+
+                    # If there is remaining amount, create a refund invoice
+                    if remaining_amount > 0:
+                        negative_remaining_amount = -remaining_amount
+                        outstanding_instance.value += negative_remaining_amount
+                        outstanding_instance.save()
+
+                        log_activity(
+                            created_by=request.user.id,
+                            description=f"Outstanding balance adjusted: {negative_remaining_amount} for customer {customer.customer_name}"
+                        )
+
+                        refund_invoice = Invoice.objects.create(
+                            # invoice_no=generate_invoice_no(datetime.today().date()),
+                            created_date=datetime.today(),
+                            net_taxable=negative_remaining_amount,
+                            vat=0,
+                            discount=0,
+                            amout_total=negative_remaining_amount,
+                            amout_recieved=0,
+                            customer=customer,
+                            reference_no=f"custom_id{customer.custom_id}"
+                        )
+
+                        if customer.sales_type == "CREDIT":
+                            refund_invoice.invoice_type = "credit_invoice"
+                            refund_invoice.save()
+
+                        item = ProdutItemMaster.objects.get(product_name="5 Gallon")
+                        InvoiceItems.objects.create(
+                            category=item.category,
+                            product_items=item,
+                            qty=0,
+                            rate=customer.rate,
+                            invoice=refund_invoice,
+                            remarks=f'Invoice generated from collection: {refund_invoice.reference_no}'
+                        )
+
+                        log_activity(
+                            created_by=request.user.id,
+                            description=f"Refund invoice {refund_invoice.invoice_no} created for remaining amount: {negative_remaining_amount}"
+                        )
+
+                return Response({"message": "Collection payment saved successfully."}, status=status.HTTP_201_CREATED)
+
+        except IntegrityError as e:
+            logger.error(f"Database integrity error: {e}")
+            return Response({"message": "An error occurred while processing the payment. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.exception(f"Unexpected error: {e}")
+            return Response({"message": "An unexpected error occurred. Please contact support."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 # class AddCollectionPayment(APIView):
 #     authentication_classes = [BasicAuthentication]
 #     permission_classes = [IsAuthenticated]
@@ -6391,19 +6190,7 @@ logger = logging.getLogger(__name__)
 
 #                     collection_cheque.invoices.set(invoices)
 
-#                     response_data = {
-#                         "status": "true",
-#                         "title": "Successfully Created",
-#                         "message": "Cheque payment saved successfully.",
-#                         "redirect": "true",
-#                         "redirect_url": f"/collections/{collection_payment.id}/details/",
-#                         "collection_id": collection_payment.id,
-#                         "receipt_number": None,
-#                         "invoice_numbers": list(invoices.values_list("invoice_no", flat=True)),
-#                         "payment_method": payment_method.upper(),
-#                         "amount_received": str(amount_received),
-#                     }
-#                     return Response(response_data, status=status.HTTP_201_CREATED)
+#                     return Response({"message": "Cheque payment saved successfully."}, status=status.HTTP_201_CREATED)
 
 #                 if payment_method.lower() == "cash" or payment_method.lower() == "card" or payment_method.lower() == "online":
 #                     remaining_amount = Decimal(amount_received)
@@ -6435,7 +6222,7 @@ logger = logging.getLogger(__name__)
 #                                     card_category=card_details.get("card_category"),
 #                                     card_amount=amount_received
 #                                 )
-
+                                
 #                             if payment_method.lower() == "online":
 #                                 CollectionOnline.objects.create(
 #                                     collection_payment=collection_payment,
@@ -6475,6 +6262,8 @@ logger = logging.getLogger(__name__)
 #                         invoice_number=",".join(invoice_numbers),
 #                         created_date=datetime.today().now()
 #                     )
+#                     receipt.invoice_number = ",".join(invoice_numbers)
+#                     receipt.save()
 
 #                     collection_payment.receipt_number = receipt.receipt_number
 #                     collection_payment.save()
@@ -6491,7 +6280,7 @@ logger = logging.getLogger(__name__)
 #                         )
 
 #                         refund_invoice = Invoice.objects.create(
-#                             # invoice_no=generate_invoice_no(datetime.today().date()),
+#                             invoice_no=generate_invoice_no(datetime.today().date()),
 #                             created_date=datetime.today(),
 #                             net_taxable=negative_remaining_amount,
 #                             vat=0,
@@ -6531,228 +6320,7 @@ logger = logging.getLogger(__name__)
 #             logger.exception(f"Unexpected error: {e}")
 #             return Response({"message": "An unexpected error occurred. Please contact support."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class AddCollectionPayment(APIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        try:
-            with transaction.atomic():
-
-                payment_method = request.data.get("payment_method")
-                amount_received = Decimal(request.data.get("amount_received", 0))
-                invoice_ids = request.data.get("invoice_ids", [])
-                customer_id = request.data.get("customer_id")
-                cheque_details = request.data.get("cheque_details", {})
-                online_details = request.data.get("online_details", {})
-
-                # -------------------- VALIDATION --------------------
-                if not invoice_ids:
-                    return Response({"message": "Invoice IDs are required."}, status=400)
-
-                try:
-                    customer = Customers.objects.select_for_update().get(pk=customer_id)
-                except Customers.DoesNotExist:
-                    return Response({"message": "Customer does not exist."}, status=404)
-
-                invoices = (
-                    Invoice.objects.select_for_update()
-                    .filter(pk__in=invoice_ids, customer=customer, is_deleted=False)
-                    .order_by("created_date")
-                )
-
-                if not invoices.exists():
-                    return Response({"message": "No valid invoices found."}, status=400)
-
-                remaining = amount_received
-                
-                collected_invoice_numbers = []
-
-                # -------------------- CREATE COLLECTION PAYMENT --------------------
-                collection_payment = CollectionPayment.objects.create(
-                    payment_method=payment_method.upper(),
-                    customer=customer,
-                    salesman=request.user,
-                    amount_received=amount_received,
-                )
-
-                # -------------------- CHEQUE PAYMENT --------------------
-                if payment_method.lower() == "cheque":
-                    CollectionCheque.objects.create(
-                        collection_payment=collection_payment,
-                        cheque_amount=amount_received,
-                        cheque_no=cheque_details.get("cheque_no"),
-                        bank_name=cheque_details.get("bank_name"),
-                        cheque_date=cheque_details.get("cheque_date"),
-                    )
-
-                    return Response({"message": "Cheque payment saved."}, status=201)
-
-                # -------------------- APPLY PAYMENT FIFO --------------------
-                for invoice in invoices:
-                    
-                    invoice_due = invoice.amout_total - invoice.amout_recieved
-                    
-
-                    if invoice_due <= 0:
-                        continue
-
-                    pay_now = min(invoice_due, remaining)
-                    
-
-                    # Update invoice
-                    invoice.amout_recieved += pay_now
-                    print("invoice amout_recieved:",invoice.amout_recieved)
-                    print("---- PROCESSING INVOICE ----")
-                    print(f"Invoice No      : {invoice.invoice_no}")
-                    print(f"Total Amount    : {invoice.amout_total}")
-                    print(f"Previously Paid : {invoice.amout_recieved}")
-                    print(f"Outstanding     : {invoice_due}")
-                    print(f"Paying Now      : {pay_now}")
-                    print(f"New Paid Total  : {invoice.amout_recieved}")
-                    print(f"New Outstanding : {invoice.amout_total - invoice.amout_recieved}")
-                    print("--------------------------------")
-                    if invoice.amout_recieved == invoice.amout_total or invoice.amout_recieved > invoice.amout_total:
-                        invoice.invoice_status = "paid"
-                    invoice.save()
-
-                    collected_invoice_numbers.append(invoice.invoice_no)
-
-                    # Save collection split
-                    invoice_due = invoice.amout_total - invoice.amout_recieved
-
-                    CollectionItems.objects.create(
-                        collection_payment=collection_payment,
-                        invoice=invoice,
-                        amount=invoice_due,           # correct
-                        amount_received=pay_now,
-                        balance=invoice_due - pay_now # correct
-                    )
-
-                    # Online details
-                    if payment_method.lower() == "online":
-                        CollectionOnline.objects.create(
-                            collection_payment=collection_payment,
-                            online_amount=pay_now,
-                            transaction_no=online_details.get("transaction_no"),
-                            transaction_date=online_details.get("transaction_date"),
-                            status=online_details.get("status", "PENDING"),
-                        )
-
-                    # Reduce outstanding (Invoice Level)
-                    self.reduce_outstanding(customer, invoice, pay_now)
-
-                    remaining -= pay_now
-                    if remaining <= 0:
-                        break
-
-                # -------------------- UPDATE CUSTOMER OUTSTANDING REPORT --------------------
-                self.rebuild_outstanding_summary(customer)
-
-              
-
-                # -------------------- GENERATE RECEIPT --------------------
-                receipt = Receipt.objects.create(
-                    transaction_type="collection",
-                    instance_id=str(collection_payment.id),
-                    amount_received=amount_received,
-                    customer=customer,
-                    invoice_number=",".join(collected_invoice_numbers),
-                    receipt_number=generate_receipt_no(str(collection_payment.created_date.date())),
-                )
-                print("reciept created successfully")
-
-                collection_payment.receipt_number = receipt.receipt_number
-                print("reciept number:",receipt.receipt_number)
-                collection_payment.save()
-                
-
-                return Response({"message": "Collection saved successfully."}, status=201)
-
-        except Exception as e:
-            return Response({"message": str(e)}, status=500)
-
-    
-    def rebuild_outstanding_summary(self, customer):
-        try:
-            print("\n================ REBUILD OUTSTANDING SUMMARY ================")
-            print(f"Customer object: {customer}")
-
-            result = Invoice.objects.filter(
-                customer=customer,
-                is_deleted=False
-            ).aggregate(
-                total_due=Sum(
-                    F("amout_total") - F("amout_recieved"),
-                    output_field=DecimalField(max_digits=12, decimal_places=2)
-                )
-            )
-
-            total_outstanding = result["total_due"] or Decimal("0.00")
-
-            print(f"Calculated Outstanding From All Invoices: {total_outstanding}")
-
-            report, created = CustomerOutstandingReport.objects.update_or_create(
-                customer=customer,
-                product_type="amount",
-                defaults={"value": total_outstanding},
-            )
-
-            if created:
-                print("New Outstanding Report Created.")
-            else:
-                print("Outstanding Report Updated.")
-
-            print(f"Final Outstanding Saved: {report.value}")
-            print("==============================================================\n")
-        except Exception as e:
-            print("❌ ERROR inside rebuild_outstanding_summary")
-            print("Error:", e)
-            traceback.print_exc()
-
-    def reduce_outstanding(self, customer, invoice, pay_amount):
-        try:
-            print("\n------------------ REDUCE OUTSTANDING ------------------")
-            print(f"Customer object: {customer}")
-            print(f"Invoice No: {invoice.invoice_no}")
-            print(f"Payment Applied: {pay_amount}")
-
-            co = CustomerOutstanding.objects.filter(
-                customer=customer,
-                product_type="amount",
-                invoice_no=invoice.invoice_no
-            ).first()
-
-            if not co:
-                print("No outstanding record found for this invoice.")
-                print("-------------------------------------------------------\n")
-                return
-
-            oa = OutstandingAmount.objects.filter(customer_outstanding=co).first()
-
-            if not oa:
-                print("OutstandingAmount record missing!")
-                print("-------------------------------------------------------\n")
-                return
-
-            old_outstanding = oa.amount
-            new_outstanding = max(Decimal(old_outstanding) - Decimal(pay_amount), 0)
-
-            # Apply update
-            oa.amount = new_outstanding
-            oa.save()
-
-            print(f"Old Outstanding: {old_outstanding}")
-            print(f"Payment Applied: -{pay_amount}")
-            print(f"New Outstanding: {new_outstanding}")
-
-            print("Outstanding Updated Successfully")
-            print("---------------------------------------------------------\n")
-        except Exception as e:
-            print("❌ ERROR inside reduce_outstanding()")
-            print("Error:", e)
-            traceback.print_exc()
-            
 class CouponTypesAPI(APIView):
     authentication_classes = [BasicAuthentication]
     permission_classes = [IsAuthenticated]
@@ -6905,7 +6473,7 @@ class CreditNoteAPI(APIView):
             start_datetime = datetime.today().date()
             end_datetime = datetime.today().date()
         
-        credit_invoices = Invoice.objects.filter(invoice_type='credit_invoice', created_date__date__range=[start_datetime, end_datetime], customer__sales_staff=request.user)
+        credit_invoices = Invoice.objects.filter(invoice_type='credit_invoive', created_date__date__range=[start_datetime, end_datetime], customer__sales_staff=request.user)
         # print('credit_invoices',credit_invoices)
         serialized = CreditNoteSerializer(credit_invoices, many=True)
         
@@ -7522,7 +7090,7 @@ class CreditSaleReportAPI(APIView):
             else:
                 date_str = datetime.today().date()
                 
-            creditsale = Invoice.objects.filter(invoice_type="credit_invoice", created_date__date=date_str)
+            creditsale = Invoice.objects.filter(invoice_type="credit_invoive", created_date__date=date_str)
             serialized_data = CreditSaleSerializer(creditsale, many=True).data
             
             return Response({'status': True, 'data': serialized_data, 'message': 'Credit Sales report passed!'})
@@ -11959,7 +11527,7 @@ class SalesInvoicesAPIView(APIView):
                 Q(amount_recieved__gt=0) | Q(customer__sales_type="FOC"),
                 **sales_filter
             )
-        elif sales_type == "credit_invoice":
+        elif sales_type == "credit_invoive":
             sales = CustomerSupply.objects.filter(
                 amount_recieved__lte=0,
                 **sales_filter
@@ -13280,7 +12848,7 @@ class EndAuditAPIView(APIView):
                             customer_outstanding_amount.save()
                             
                             if audit_detail.customer.sales_type == "CREDIT":
-                                invoice.invoice_type = "credit_invoice"
+                                invoice.invoice_type = "credit_invoive"
                                 invoice.save()
 
                             # Create invoice items
@@ -13308,7 +12876,7 @@ class EndAuditAPIView(APIView):
                             #     )
                                 
                             #     if audit_detail.customer.sales_type == "CREDIT":
-                            #         invoice.invoice_type = "credit_invoice"
+                            #         invoice.invoice_type = "credit_invoive"
                             #         invoice.save()
 
                             #     # Create invoice items

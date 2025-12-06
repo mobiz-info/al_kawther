@@ -102,7 +102,7 @@
                                         <th>Building No</th>
                                         <th>Route</th>
                                         <th>Outstanding Type</th>
-                                        <th>Amount</th>
+                                        <th>Count</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
@@ -112,34 +112,14 @@
                                         <td>{{ forloop.counter }}</td>
                                         <td>{{ item.created_date }}</td>
                                         <td>{{ item.invoice_no }}</td>
-                                        <td>{{ item.customer }}</td>
-                                        <td>{{ item.building_no }}</td>
-                                        <td>{{ item.route }}</td>
-                                        <td>{{ item.outstanding_type }}</td>
-                                        <td>{{ item.amount }}</td>
+                                        <td>{{ item.customer.customer_name }}</td>
+                                        <td>{{ item.customer.building_name }}</td>
+                                        <td>{{ item.customer.routes.route_name}}</td>
+                                        <td>{{ item.get_product_type_display }}</td>
+                                        <td>{{ item.get_outstanding_count }}</td>
                                         <td>
                                             <div class="g-2">
-                                                {% if item.outstanding_pk %}
-                                                    <a href="{% url 'edit_customer_outstanding' item.outstanding_pk %}"
-                                                       class="btn btn-primary-light btn-sm ms-2"
-                                                       data-bs-toggle="tooltip" data-bs-original-title="Edit">
-                                                        <span class="ri-pencil-line fs-14"></span>
-                                                    </a>
-                                        
-                                                    <a href="{% url 'delete_outstanding' pk=item.outstanding_pk %}"
-                                                       class="btn btn-danger-light btn-sm ms-2 action-button remove"
-                                                       data-bs-toggle="tooltip" data-bs-original-title="Delete">
-                                                        <span class="ri-delete-bin-7-line fs-14"></span>
-                                                    </a>
-                                                {% else %}
-                                                    <span class="text-muted">No Record</span>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                        {% comment %} <td>
-                                            <div class="g-2">
-                                                
-                                                <a href="{% url 'edit_customer_outstanding' item.outstanding_pk %}?customer_pk={{ customer_pk }}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
+                                                <a href="{% url 'edit_customer_outstanding' item.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
                                                     <span class="ri-pencil-line fs-14"></span>
                                                 </a>
                                                 <a aria-label="anchor" class="action-button remove btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete"
@@ -147,17 +127,10 @@
                                                 </a>
                                                 
                                             </div>
-                                        </td> {% endcomment %}
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <th colspan="7" style="text-align:right;">Total Outstanding</th>
-                                        <th>{{ total_outstanding }}</th>
-                                        <th></th>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
                     </div>

@@ -14,7 +14,7 @@ from product.models import Product, ProdutItemMaster
 # Create your models here.
 INVOICE_TYPES = (
     ('cash_invoice', 'Cash Invoice'),
-    ('credit_invoice', 'Credit Invoice'),
+    ('credit_invoive', 'Credit Invoice'),
 )
 
 INVOICE_STATUS = (
@@ -35,8 +35,6 @@ class Invoice(models.Model):
     discount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     amout_total = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     amout_recieved = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-    vat_amount = models.DecimalField(default=0, max_digits=10, decimal_places=2)
-    amount_before_vat = models.DecimalField(default=0, max_digits=10, decimal_places=2)
     
     customer = models.ForeignKey(Customers, on_delete=models.CASCADE)
     is_deleted = models.BooleanField(default=False)
