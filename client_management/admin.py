@@ -47,6 +47,10 @@ class CustomerOutstandingAmountAdmin(admin.ModelAdmin):
     invoice_no.admin_order_field = 'customer_outstanding__invoice_no'
     invoice_no.short_description = 'Invoice No'
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.filter(amount=0)
+    
     def created_by(self, obj):
         return obj.customer_outstanding.created_by
     created_by.admin_order_field = 'customer_outstanding__created_by'

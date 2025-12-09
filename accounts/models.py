@@ -122,7 +122,7 @@ class Customers(models.Model):
     location = models.ForeignKey('master.LocationMaster', on_delete=models.SET_NULL, null=True, blank=False)
     emirate = models.ForeignKey('master.EmirateMaster', on_delete=models.SET_NULL, null=True, blank=False)
     mobile_no = models.CharField(max_length=250, null=True, blank=True)
-    whatsapp_contry_code = models.CharField(max_length=10, null=True, blank=True)
+    # whatsapp_contry_code = models.CharField(max_length=10, null=True, blank=True)
     whats_app = models.CharField(max_length=250, null=True, blank=True)
     email_id = models.CharField(max_length=250, null=True, blank=True)
     gps_latitude = models.CharField(max_length=100, default=0)
@@ -151,9 +151,9 @@ class Customers(models.Model):
     eligible_foc = models.IntegerField(default=0)
     is_deleted = models.BooleanField(default=False)
     gps_module_active = models.BooleanField(default=False)
-    is_exported = models.BooleanField(default=False)
-    is_guest = models.BooleanField(default=False)
-    preferred_language = models.CharField(max_length=100,default="EN")
+    # is_exported = models.BooleanField(default=False)
+    # is_guest = models.BooleanField(default=False)
+    # preferred_language = models.CharField(max_length=100,default="EN")
     
      
     def __str__(self):
