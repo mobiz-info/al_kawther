@@ -9,7 +9,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         
-        Instances = Customers.objects.filter(is_guest=False, rate__in=["6.5"])
+        Instances = Customers.objects.filter( rate__in=["6.5"])
         
         for customer in Instances:
             

@@ -305,7 +305,7 @@ class InitiateSaleView(FormView, View):
         coupon_method = request.GET.get('coupon_method')
         print("coupon_methodcoupon_method", coupon_method)
         # Fetch the customer object
-        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
+        customer = Customers.objects.filter( customer_id=customer_id).first()
         # Check if the customer exists
         # Filter AssignStaffCouponDetails based on customer_id
         assign_staff_coupon_details = AssignStaffCouponDetails.objects.filter(
@@ -372,7 +372,7 @@ class InitiateSaleView(FormView, View):
         sales_type = request.POST.get('sales_type')
         customer_id = request.POST.get('customer_id')
         product_id = request.POST.get('product_id')
-        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
+        customer = Customers.objects.filter( customer_id=customer_id).first()
         product = Product.objects.filter(product_id=product_id).first()
         id_status = request.POST.get('status')
         # Get sales_type from form data
@@ -401,7 +401,7 @@ class InitiateSaleView(FormView, View):
                 print("eeeeeeeeeeeeeeeeeeeeeeeee")
                 invoice_number=request.POST.get('invoice_number')
                 sales_temp_data = SalesTemp.objects.get(invoice_number=invoice_number).data
-                customer = Customers.objects.filter(is_guest=False, customer_id=sales_temp_data['customer_id']).first()
+                customer = Customers.objects.filter( customer_id=sales_temp_data['customer_id']).first()
                 product = Product.objects.filter(product_id=sales_temp_data['product_id']).first()
                 get_tax_percentage= Tax.objects.filter(name="vat").first()
                 vat_value= get_tax_percentage/100
@@ -668,7 +668,7 @@ class PaymentForm(View):
             sales_temp = SalesTemp.objects.create(invoice_number=invoice_number, data=data)
 
         # Fetch the rate from the Customers table based on the customer_id
-        customer = Customers.objects.filter(is_guest=False, customer_id=customer_id).first()
+        customer = Customers.objects.filter( customer_id=customer_id).first()
         if customer:
             customer_type = customer.customer_type
             get_customer_default_price = Product_Default_Price_Level.objects.filter(customer_type=customer_type, product_id=product_id).first()
@@ -1698,7 +1698,7 @@ def yearmonthsalesreport(request):
 # def yearmonthsalesreportview(request,route_id):
 #     route = RouteMaster.objects.get(route_id = route_id)
 #     print(route,'route')
-#     route_customer = Customers.objects.filter(is_guest=False, routes__route_name=route)
+#     route_customer = Customers.objects.filter( routes__route_name=route)
 #     print(route_customer,'route_customer')
 
 #     context = {
@@ -1708,7 +1708,7 @@ def yearmonthsalesreport(request):
 #     return render(request, 'sales_management/yearmonthsalesreportview.html',context)
 # def yearmonthsalesreportview(request, route_id):
 #     route = RouteMaster.objects.get(route_id=route_id)
-#     route_customers = Customers.objects.filter(is_guest=False, routes__route_name=route)
+#     route_customers = Customers.objects.filter( routes__route_name=route)
 
 #     # Calculate YTD and MTD sales for each customer
 #     today = date.today()
@@ -1742,7 +1742,7 @@ def yearmonthsalesreportview(request, route_id):
 
     yearly_sales = CustomerSupply.objects.filter(customer__routes=route, created_date__year=current_year).aggregate(total_sales=Sum('grand_total'))['total_sales'] or 0
 
-    customers = Customers.objects.filter(is_guest=False, routes__route_name=route)
+    customers = Customers.objects.filter( routes__route_name=route)
     monthly_sales = []
     for customer in customers:
         monthly_sales_data = []
@@ -4060,7 +4060,7 @@ def visitstatistics_report(request):
             driver_name = driver.get_fullname() if driver else "N/A"
 
             # Calculate statistics for the current route
-            new_customers_count = Customers.objects.filter(is_guest=False, 
+            new_customers_count = Customers.objects.filter( 
                 created_date__date__range=[from_date, to_date],
                 sales_staff_id=salesman
             ).count()
@@ -4151,7 +4151,7 @@ def visitstatistics_report_print(request):
             driver_name = driver.get_fullname() if driver else "N/A"
 
             # Calculate statistics for the current route
-            new_customers_count = Customers.objects.filter(is_guest=False, 
+            new_customers_count = Customers.objects.filter( 
                 created_date__date__range=[from_date, to_date],
                 sales_staff_id=salesman
             ).count()
@@ -4406,7 +4406,7 @@ def dsr_summary(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -4554,9 +4554,9 @@ def dsr_summary(request):
         suspense_balance_amount = today_payable - suspense_paid_amount
         
         # collection details
-        dialy_collections = CollectionPayment.objects.filter(customer__routes__route_name=route_name,customer__is_guest=False)
+        dialy_collections = CollectionPayment.objects.filter(customer__routes__route_name=route_name)
         # credit outstanding
-        outstanding_amount_upto_yesterday = OutstandingAmount.objects.filter(customer_outstanding__product_type="amount",customer_outstanding__created_date__date__lte=yesterday_date,customer_outstanding__customer__routes__route_name=route_name,customer_outstanding__customer__is_guest=False).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        outstanding_amount_upto_yesterday = OutstandingAmount.objects.filter(customer_outstanding__product_type="amount",customer_outstanding__created_date__date__lte=yesterday_date,customer_outstanding__customer__routes__route_name=route_name).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         dialy_colection_upto_yesterday = dialy_collections.filter(created_date__date__lte=yesterday_date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
         todays_opening_outstanding_amount = outstanding_amount_upto_yesterday - dialy_colection_upto_yesterday
         credit_outstanding_collected_amount = dialy_collections.filter(created_date__date=date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
@@ -4901,7 +4901,7 @@ def dsr_summary1(request):
     
     
         #new customers created
-        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -5390,7 +5390,7 @@ def print_dsr_summary(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -5812,7 +5812,7 @@ def print_dsr_summary(request):
 #         salesman = van_route.van.salesman
 #         filter_data['route_name'] = route_name
 #         #new customers created
-#         new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+#         new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
 #         #emergency supply
 #         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
 #         #actual visit
@@ -6002,7 +6002,7 @@ def print_dsr_summary(request):
 #         salesman = van_route.van.salesman
 #         filter_data['route_name'] = route_name
 #         #new customers created
-#         new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+#         new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
 #         #emergency supply
 #         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
 #         #actual visit
@@ -6454,7 +6454,7 @@ def dsr(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit
@@ -6892,7 +6892,7 @@ def print_dsr(request):
         salesman_id = salesman.pk
         filter_data['route_name'] = route_name
         #new customers created
-        new_customers_count = Customers.objects.filter(is_guest=False, created_date__date=date,sales_staff_id=salesman).count()
+        new_customers_count = Customers.objects.filter( created_date__date=date,sales_staff_id=salesman).count()
         #emergency supply
         emergency_supply_count = DiffBottlesModel.objects.filter(created_date__date=date, assign_this_to_id=salesman).count()
         #actual visit

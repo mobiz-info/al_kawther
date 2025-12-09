@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
         # ---- CUSTOMERS ----
         new_customers_count = Customers.objects.filter(
-            is_guest=False, created_date__date=date, sales_staff_id=salesman
+             created_date__date=date, sales_staff_id=salesman
         ).count()
 
         emergency_supply_count = DiffBottlesModel.objects.filter(
@@ -104,11 +104,10 @@ class Command(BaseCommand):
             customer_outstanding__product_type="amount",
             customer_outstanding__created_date__date__lt=date,
             customer_outstanding__customer__routes__route_name=route_name,
-            customer_outstanding__customer__is_guest=False,
         ).aggregate(total_amount=Sum("amount"))["total_amount"] or 0
 
         dialy_collections = CollectionPayment.objects.filter(
-            customer__routes__route_name=route_name, customer__is_guest=False
+            customer__routes__route_name=route_name
         )
 
         dialy_colection_upto_yesterday = dialy_collections.filter(

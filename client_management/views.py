@@ -163,7 +163,7 @@ def customer_custody_item(request,customer_id):
 # def customer_custody_item(request,customer_id):
 #     template_name = 'client_management/add_custody_items.html'
 #     if request.method == "GET":
-#         customer_exists = Customers.objects.filter(is_guest=False, customer_id=customer_id).exists()
+#         customer_exists = Customers.objects.filter( customer_id=customer_id).exists()
 #         if customer_exists:
 #             customer_data = Customers.objects.get(customer_id=customer_id)
 #             products = ProdutItemMaster.objects.all()
@@ -237,7 +237,7 @@ def get_custody_items(request):
     if request.method == "GET":
         customer = request.GET['customer']
         if customer is not None:
-            customer_exists = Customers.objects.filter(is_guest=False, customer_id=customer).exists()
+            customer_exists = Customers.objects.filter( customer_id=customer).exists()
             if customer_exists:
                 customer_data = Customers.objects.get(customer_id=customer)
                 branch_id=request.user.branch_id.branch_id
@@ -306,7 +306,7 @@ class Vacation_Add(View):
         search_form = CustomerSearchForm()
         selected_route = request.GET.get('route')
         print('root',selected_route)
-        customers = Customers.objects.filter(is_guest=False, routes = selected_route)
+        customers = Customers.objects.filter( routes = selected_route)
         search_query = request.GET.get('search_query')
         if search_query:
             customers = customers.filter(
@@ -617,7 +617,7 @@ def customer_supply_info(request,pk):
 def customer_supply_customers(request):
     filter_data = {}
     
-    instances = Customers.objects.filter(is_guest=False, is_deleted=False,is_active=True)
+    instances = Customers.objects.filter( is_deleted=False,is_active=True)
     
     if request.GET.get('route'):
         instances = instances.filter(routes__pk=request.GET.get('route'))
@@ -2577,7 +2577,7 @@ def customer_outstanding_list(request):
     filter_data['route_name'] = route_name
     
     # Base QuerySet for ALL customers on the route
-    all_customers_on_route = Customers.objects.filter(is_guest=False, routes__route_name=route_name)
+    all_customers_on_route = Customers.objects.filter( routes__route_name=route_name)
 
     if customer_pk := request.GET.get("customer_pk"):
         all_customers_on_route = all_customers_on_route.filter(pk=customer_pk)
@@ -2843,7 +2843,7 @@ def print_customer_outstanding(request):
     filter_data['route_name'] = route_name
     
     # Base QuerySet for ALL customers on the route
-    all_customers_on_route = Customers.objects.filter(is_guest=False, routes__route_name=route_name)
+    all_customers_on_route = Customers.objects.filter( routes__route_name=route_name)
 
     if customer_pk := request.GET.get("customer_pk"):
         all_customers_on_route = all_customers_on_route.filter(pk=customer_pk)
@@ -2981,7 +2981,7 @@ def excel_customer_outstanding(request):
         outstanding_instances = outstanding_instances.filter(customer__customer_name__icontains=q)
     
     customer_ids = outstanding_instances.values_list('customer__pk', flat=True).distinct()
-    instances = Customers.objects.filter(is_guest=False, pk__in=customer_ids)
+    instances = Customers.objects.filter( pk__in=customer_ids)
 
     # Calculate total outstanding and total collections for net total
     total_outstanding = OutstandingAmount.objects.filter(
@@ -3561,9 +3561,9 @@ def customer_count(request):
         if van_route and van_route.van:
             sales_man = van_route.van.salesman
         
-        cash_count = Customers.objects.filter(is_guest=False, routes=route, sales_type='CASH').count()
-        credit_count = Customers.objects.filter(is_guest=False, routes=route, sales_type='CREDIT').count()
-        coupon_count = Customers.objects.filter(is_guest=False, routes=route, sales_type__in=['CASH COUPON', 'CREDIT COUPON']).count()
+        cash_count = Customers.objects.filter( routes=route, sales_type='CASH').count()
+        credit_count = Customers.objects.filter( routes=route, sales_type='CREDIT').count()
+        coupon_count = Customers.objects.filter( routes=route, sales_type__in=['CASH COUPON', 'CREDIT COUPON']).count()
 
         total_cash += cash_count
         total_credit += credit_count
@@ -3580,9 +3580,9 @@ def customer_count(request):
             })
 
     # customers with no route specified
-    cash_count = Customers.objects.filter(is_guest=False, routes=None, sales_type='CASH').count()
-    credit_count = Customers.objects.filter(is_guest=False, routes=None, sales_type='CREDIT').count()
-    coupon_count = Customers.objects.filter(is_guest=False, routes=None, sales_type__in=['CASH COUPON', 'CREDIT COUPON']).count()
+    cash_count = Customers.objects.filter( routes=None, sales_type='CASH').count()
+    credit_count = Customers.objects.filter( routes=None, sales_type='CREDIT').count()
+    coupon_count = Customers.objects.filter( routes=None, sales_type__in=['CASH COUPON', 'CREDIT COUPON']).count()
 
     total_cash += cash_count
     total_credit += credit_count
@@ -3619,7 +3619,7 @@ def bottle_count(request):
     
 
 def bottle_count_route_wise(request, route_id):
-    customers = Customers.objects.filter(is_guest=False, routes__pk=route_id)
+    customers = Customers.objects.filter( routes__pk=route_id)
     
     context = {
         "instances" : customers
@@ -4894,7 +4894,7 @@ class CustomerListView(View):
     def get(self, request, route_id):
         route = get_object_or_404(RouteMaster, route_id=route_id)
 
-        customers = Customers.objects.filter(is_guest=False, routes=route)
+        customers = Customers.objects.filter( routes=route)
 
         query = request.GET.get("q", "")
         if query:
@@ -5184,7 +5184,7 @@ def customer_outstanding_report(request):
         
         total_collection_upto = CollectionPayment.objects.filter(customer__pk__in=outstanding_customer_ids, created_date__date__gt=closing_date, created_date__date__lte=to_date).aggregate(total_amount=Sum('amount_received'))['total_amount'] or 0
 
-    customer_instances = Customers.objects.filter(is_guest=False, pk__in=outstanding_customer_ids)
+    customer_instances = Customers.objects.filter( pk__in=outstanding_customer_ids)
     
     context = {
         "filter_data": filter_data,

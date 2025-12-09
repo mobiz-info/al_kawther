@@ -118,7 +118,7 @@ def overview(request):
     door_lock_count = NonvisitReport.objects.filter(created_date__date=date,reason__reason_text="Door Lock").count()
     emergency_customers_count = customers_instances.filter(pk__in=DiffBottlesModel.objects.filter(delivery_date=date).values_list('customer__pk')).count()
     
-    new_customers_count_with_salesman = (Customers.objects.filter(is_guest=False, created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username'))
+    new_customers_count_with_salesman = (Customers.objects.filter( created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username'))
     
     
     context = {
@@ -507,7 +507,7 @@ def customer_statistics(request):
     today = now().date()
     start_of_month = today.replace(day=1)
 
-    route_data = Customers.objects.filter(is_guest=False, routes__route_name__isnull=False).values(
+    route_data = Customers.objects.filter( routes__route_name__isnull=False).values(
         'routes__route_name'
     ).annotate(
         today_new_customers=Count('customer_id', filter=Q(created_date__date=today)),
@@ -521,7 +521,7 @@ def customer_statistics(request):
     route_inactive_customer_count = {}
     inactive_customers_count = 0
     for route in routes:
-        route_customers = Customers.objects.filter(is_guest=False, routes=route)
+        route_customers = Customers.objects.filter( routes=route)
 
         visited_customers = CustomerSupply.objects.filter(
                 created_date__date__range=(last_20_days, today)
@@ -578,7 +578,7 @@ def customer_statistics(request):
     )
 
     churn = (
-        Customers.objects.filter(is_guest=False, is_active=False)  
+        Customers.objects.filter( is_active=False)  
         .annotate(month=TruncMonth("created_date"))
         .values("month")
         .annotate(count=Count("customer_id"))
@@ -604,7 +604,7 @@ def customer_statistics(request):
 
     for route in routes:
         route_id = route.route_id
-        actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
+        actual_visitors = Customers.objects.filter( routes__pk=route_id, is_active=True).count()
 
         planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
         planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
@@ -1301,8 +1301,8 @@ def terms_and_conditions_delete(request, pk):
 #         ]
         
 #         Retrieve customer instances for mismatched customers
-#         instances = Customers.objects.filter(is_guest=False, pk__in=mismatched_customers)
-#         instances = Customers.objects.filter(is_guest=False, custom_id__in=custom_ids).exclude(custom_id__in=exclude_ids)
+#         instances = Customers.objects.filter( pk__in=mismatched_customers)
+#         instances = Customers.objects.filter( custom_id__in=custom_ids).exclude(custom_id__in=exclude_ids)
         
 #         context = {
 #             'instances': instances

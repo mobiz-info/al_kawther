@@ -304,7 +304,7 @@ class User_Delete(View):
 #             # Filter the queryset based on the form data
 #         route_filter = request.GET.get('route_name')
 #         if route_filter :
-#             user_li = Customers.objects.filter(is_guest=False, routes__route_name=route_filter)
+#             user_li = Customers.objects.filter( routes__route_name=route_filter)
 #         # else:
 #         #         user_li = Customers.objects.all()
 #         # else:
@@ -380,7 +380,7 @@ class Customer_List(View):
         status_filter = request.GET.get('status')
 
         # Start with all customers
-        user_li = Customers.objects.filter(is_guest=False, is_deleted=False).select_related('location', 'routes')
+        user_li = Customers.objects.filter( is_deleted=False).select_related('location', 'routes')
 
         # Apply filters
         if query:
@@ -533,7 +533,7 @@ class Customer_List(View):
 def print_multiple_qrs(request):
     if request.method == 'POST':
         customer_ids = request.POST.getlist('customer_ids')
-        customers = Customers.objects.filter(is_guest=False, pk__in=customer_ids)
+        customers = Customers.objects.filter( pk__in=customer_ids)
 
         qr_data_list = []
         for customer in customers:
@@ -562,7 +562,7 @@ class Latest_Customer_List(View):
         customer_type_filter = request.GET.get('customer_type')
 
         ten_days_ago = datetime.now() - timedelta(days=10)
-        user_li = Customers.objects.filter(is_guest=False, created_date__gte=ten_days_ago,is_deleted=False)
+        user_li = Customers.objects.filter( created_date__gte=ten_days_ago,is_deleted=False)
         
         if request.GET.get('start_date'):
             start_date = request.GET.get('start_date')
@@ -649,7 +649,7 @@ class Inactive_Customer_List(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
 
-                route_customers = Customers.objects.filter(is_guest=False, routes=van_route.routes,is_deleted=False,is_active=True)
+                route_customers = Customers.objects.filter( routes=van_route.routes,is_deleted=False,is_active=True)
                 
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
                 todays_customer_ids = {customer['customer_id'] for customer in todays_customers}
@@ -751,7 +751,7 @@ class PrintInactiveCustomerList(View):
                     created_date__date__range=(from_date, to_date)
                 ).values_list('customer_id', flat=True)
                 
-                route_customers = Customers.objects.filter(is_guest=False, routes=van_route.routes,is_deleted=False,is_active=True)
+                route_customers = Customers.objects.filter( routes=van_route.routes,is_deleted=False,is_active=True)
                 
                 # Ensure `todays_customers` is an empty list if `find_customers` returns None
                 todays_customers = find_customers(request, str(today), van_route.routes.pk) or []
@@ -1079,7 +1079,7 @@ def customer_list_excel(request):
     route_filter = request.GET.get('route_name')
 
     # Optimize by selecting only required fields
-    user_li = Customers.objects.filter(is_guest=False, is_deleted=False).select_related('routes', 'location')
+    user_li = Customers.objects.filter( is_deleted=False).select_related('routes', 'location')
 
     if query and query not in ('', 'None'):
         user_li = user_li.filter(
@@ -1631,7 +1631,7 @@ class MissingCustomersView(View):
 
         # for route in routes:
         #     route_id = route.route_id  # Use route_id from RouteMaster
-        #     actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
+        #     actual_visitors = Customers.objects.filter( routes__pk=route_id, is_active=True).count()
 
         #     planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
         #     planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
@@ -1695,7 +1695,7 @@ class MissingCustomersPdfView(View):
 
         for route in routes:
             route_id = route.route_id
-            actual_visitors = Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count()
+            actual_visitors = Customers.objects.filter( routes__pk=route_id, is_active=True).count()
 
             planned_visitors_list = find_customers(request, str(date), route_id)  # Ensure this returns a list
             planned_visitors = len(planned_visitors_list) if planned_visitors_list else 0
@@ -1888,10 +1888,10 @@ class Gps_Route_List(View):
 def activate_gps_for_route(request, route_id):
     route = get_object_or_404(RouteMaster, route_id=route_id)
     
-    gps_active = Customers.objects.filter(is_guest=False, routes=route, gps_module_active=True).exists()
+    gps_active = Customers.objects.filter( routes=route, gps_module_active=True).exists()
     
     if gps_active:
-        Customers.objects.filter(is_guest=False, routes=route).update(gps_module_active=False)
+        Customers.objects.filter( routes=route).update(gps_module_active=False)
 
         GpsLog.objects.filter(route=route, gps_enabled=True, turn_off_time__isnull=True).update(turn_off_time=now())
 
@@ -1906,7 +1906,7 @@ def activate_gps_for_route(request, route_id):
         messages.success(request, f"GPS Lock disabled for all customers in route: {route.route_name}")
 
     else:
-        Customers.objects.filter(is_guest=False, routes=route).update(gps_module_active=True)
+        Customers.objects.filter( routes=route).update(gps_module_active=True)
 
         GpsLog.objects.create(
             route=route,

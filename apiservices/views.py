@@ -904,7 +904,7 @@ def find_customers(request, def_date, route_id):
     
     todays_customers = []
     buildings = []
-    for customer in Customers.objects.filter(is_guest=False, routes=route,is_calling_customer=False,is_deleted=False,is_active=True).exclude(pk__in=vocation_customer_ids):
+    for customer in Customers.objects.filter( routes=route,is_calling_customer=False,is_deleted=False,is_active=True).exclude(pk__in=vocation_customer_ids):
         if customer.visit_schedule:
             for day, weeks in customer.visit_schedule.items():
                 if day in str(day_of_week) and week_number in str(weeks):
@@ -939,7 +939,7 @@ def find_customers(request, def_date, route_id):
 
         building_gps = []
         for building, bottle_count in building_count.items():
-            c = Customers.objects.filter(is_guest=False, building_name=building, routes=route,is_deleted=False).first()
+            c = Customers.objects.filter( building_name=building, routes=route,is_deleted=False).first()
             building_gps.append((building, c.gps_longitude, c.gps_latitude, bottle_count))
 
         # Sort buildings by GPS coordinates
@@ -1046,7 +1046,7 @@ def find_customers(request, def_date, route_id):
     
 #     todays_customers = []
 #     buildings = []
-#     for customer in Customers.objects.filter(is_guest=False, routes=route):
+#     for customer in Customers.objects.filter( routes=route):
 #         if customer.visit_schedule:
 #             for day, weeks in customer.visit_schedule.items():
 #                 if day in str(day_of_week) and week_number in str(weeks):
@@ -1090,7 +1090,7 @@ def find_customers(request, def_date, route_id):
 
 #         building_gps = []
 #         for building, bottle_count in building_count.items():
-#             c = Customers.objects.filter(is_guest=False, building_name=building, routes=route).first()
+#             c = Customers.objects.filter( building_name=building, routes=route).first()
 #             building_gps.append((building, c.gps_longitude, c.gps_latitude, bottle_count))
 
 #         sorted_building_gps = sorted(building_gps, key=lambda x: (x[1] if x[1] is not None else '', x[2] if x[2] is not None else ''))
@@ -1585,7 +1585,7 @@ class Customer_API(APIView):
                     description=f"Fetched details for customer  {queryset.customer_name}"
                 )
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            queryset = Customers.objects.filter(is_guest=False, is_deleted=False)
+            queryset = Customers.objects.filter( is_deleted=False)
             serializer = CustomersSerializers(queryset, many=True)
             log_activity(
                 created_by=request.user.id,
@@ -1603,10 +1603,10 @@ class Customer_API(APIView):
             serializer = CustomersCreateSerializers(data=request.data)
             if serializer.is_valid(raise_exception=True):
                 custody_value = int(request.data.get('custody_count', 0)) 
-                if request.data["mobile_no"] and Customers.objects.filter(is_guest=False, mobile_no=request.data["mobile_no"]).exists():
+                if request.data["mobile_no"] and Customers.objects.filter( mobile_no=request.data["mobile_no"]).exists():
                     return Response({'data': 'Customer with this mobile number already exists! Try another number'}, status=status.HTTP_400_BAD_REQUEST)
                 
-                if request.data["email_id"] and Customers.objects.filter(is_guest=False, email_id=request.data["email_id"]).exists():
+                if request.data["email_id"] and Customers.objects.filter( email_id=request.data["email_id"]).exists():
                     return Response({'data': 'Customer with this Email Id already exists! Try another Email Id'}, status=status.HTTP_400_BAD_REQUEST)
                 
                 if request.data["mobile_no"]:
@@ -2237,7 +2237,7 @@ class Get_Items_API(APIView):
     def get(self, request, id=None):
         try:
             if id:
-                customer_exists = Customers.objects.filter(is_guest=False, customer_id=id).exists()
+                customer_exists = Customers.objects.filter( customer_id=id).exists()
                 if not customer_exists:
                     return Response({'status': False, 'message': 'Customer Not Exists'})
 
@@ -2330,7 +2330,7 @@ class Get_Items_API(APIView):
     # def get(self,request,id=None):
     #     try:
     #         #customer = request.data['id']
-    #         customer_exists = Customers.objects.filter(is_guest=False, customer_id=id).exists()
+    #         customer_exists = Customers.objects.filter( customer_id=id).exists()
     #         if customer_exists:
     #             customer_data = Customers.objects.get(customer_id=id)
     #             print(customer_data.branch_id)
@@ -2462,7 +2462,7 @@ class Add_Customer_Custody_Item_API(APIView):
 
     def get(self,request,id=None):
         try:
-            customer_exists = Customers.objects.filter(is_guest=False, customer_id=id).exists()
+            customer_exists = Customers.objects.filter( customer_id=id).exists()
             if customer_exists:
                 customer = Customers.objects.get(customer_id=id)
                 custody_list = CustomerCustodyStock.objects.filter(customer=customer)
@@ -2527,7 +2527,7 @@ class Add_No_Coupons(APIView):
 
     def get(self,request,id=None):
         try:
-            customer_exists = Customers.objects.filter(is_guest=False, customer_id=id).exists()
+            customer_exists = Customers.objects.filter( customer_id=id).exists()
             if customer_exists:
                 customer_exists = Customers.objects.get(customer_id=id)
                 custody_list = Customer_Inhand_Coupons.objects.filter(customer=customer_exists.customer_id)
@@ -2729,7 +2729,7 @@ class Customer_Create(APIView):
             print('password',password)
             hashed_password=make_password(password)
 
-            if Customers.objects.filter(is_guest=False, mobile_no=request.data["mobile_no"]).exists():
+            if Customers.objects.filter( mobile_no=request.data["mobile_no"]).exists():
                 description = f"Attempt to create a customer with an existing mobile number: {username}"
                 log_activity(created_by=request.user, description=description)
                 
@@ -2811,7 +2811,7 @@ class Check_Customer(APIView):
     def post(self, request, *args, **kwargs):
         try:
             mobile = request.data['mobile']
-            user_exists = Customers.objects.filter(is_guest=False, mobile_no=mobile).exists()
+            user_exists = Customers.objects.filter( mobile_no=mobile).exists()
             
             description = f"Checking if customer exists with mobile: {mobile}"
             log_activity(created_by=request.user, description=description)
@@ -3065,7 +3065,7 @@ class Myclient_API(APIView):
 
                         routes_list = RouteMaster.objects.filter(route_id__in=assign_routes).values_list('route_id', flat=True)
 
-                        customer_list = Customers.objects.filter(is_guest=False, routes__pk__in=routes_list,is_deleted=False,is_active=True)
+                        customer_list = Customers.objects.filter( routes__pk__in=routes_list,is_deleted=False,is_active=True)
                         serializer = self.serializer_class(customer_list, many=True)
                         
                         log_activity(staff.id, f"Fetched {len(customer_list)} customers for staff {userid}")
@@ -3082,7 +3082,7 @@ class Myclient_API(APIView):
             elif route_id and not userid:
                 try:
                     print(f"Received route_id: {route_id}")  # Debugging
-                    customer_list = Customers.objects.filter(is_guest=False, routes__route_id=route_id, is_deleted=False,is_active=True)
+                    customer_list = Customers.objects.filter( routes__route_id=route_id, is_deleted=False,is_active=True)
                     print(f"Found {len(customer_list)} customers")  # Debugging
                     serializer = self.serializer_class(customer_list, many=True)
                     log_activity(request.user, f"Fetched {len(customer_list)} customers for route {route_id}")
@@ -3101,7 +3101,7 @@ class Myclient_API(APIView):
                         # Check if the route is valid for the van
                         assign_routes = Van_Routes.objects.filter(van=vans).values_list('routes', flat=True)
                         if route_id in assign_routes:
-                            customer_list = Customers.objects.filter(is_guest=False, routes__pk=route_id,is_deleted=False,is_active=True)
+                            customer_list = Customers.objects.filter( routes__pk=route_id,is_deleted=False,is_active=True)
                             serializer = self.serializer_class(customer_list, many=True)
                             return Response(serializer.data)
                         else:
@@ -3127,7 +3127,7 @@ class GetCustodyItem_API(APIView):
         try:
             user_id=request.user.id
             log_activity(user_id, "Request received to fetch custody items for user")
-            customerobj=Customers.objects.filter(is_guest=False, sales_staff=user_id)
+            customerobj=Customers.objects.filter( sales_staff=user_id)
             for customer in customerobj:
                 customerid=customer.customer_id
                 custody_items=CustodyCustomItems.objects.filter(customer=customerid)
@@ -3145,7 +3145,7 @@ class GetCustodyItem_API(APIView):
 def get_lower_coupon_customers(request):
     if not (inhand_instances:=CustomerCouponStock.objects.filter(count__lte=5)).exists():
         customers_ids = inhand_instances.values_list('customer__customer_id', flat=True)
-        instances = Customers.objects.filter(is_guest=False, sales_type="CASH COUPON",pk__in=customers_ids)
+        instances = Customers.objects.filter( sales_type="CASH COUPON",pk__in=customers_ids)
         log_activity(request.user, f"Found {instances.count()} customers with sales type 'CASH COUPON'")
         serialized = LowerCouponCustomersSerializer(instances, many=True, context={"request": request})
         log_activity(request.user, f"Returning {len(serialized.data)} customer records with lower coupon stock")
@@ -5283,7 +5283,7 @@ class customerCouponStock(APIView):
     authentication_classes = [BasicAuthentication]
     permission_classes = [IsAuthenticated]
     def get(self, request, *args, **kwargs):
-        if (customers:=Customers.objects.filter(is_guest=False, sales_staff=request.user)).exists():
+        if (customers:=Customers.objects.filter( sales_staff=request.user)).exists():
             route_id = request.GET.get("route_id")
             
             if route_id :
@@ -5315,7 +5315,7 @@ class customerCouponStock(APIView):
 #     def get(self, request, *args, **kwargs):
 #         try:
 #             user_id = request.user.id
-#             customer_obj = Customers.objects.filter(is_guest=False, sales_staff=user_id)
+#             customer_obj = Customers.objects.filter( sales_staff=user_id)
 #             custody_items = CustodyCustomItems.objects.filter(customer__in=customer_obj)
 #             serializer = self.serializer_class(custody_items, many=True)
 
@@ -5350,10 +5350,10 @@ class CustodyCustomItemListAPI(APIView):
         customer_id = request.query_params.get('customer_id')
         if customer_id:
             custody_customer_ids = CustomerCustodyStock.objects.filter(customer__pk=customer_id).values_list("customer__customer_id", flat=True)
-            customers = Customers.objects.filter(is_guest=False, pk__in=custody_customer_ids)
+            customers = Customers.objects.filter( pk__in=custody_customer_ids)
         else:
             custody_customer_ids = CustomerCustodyStock.objects.filter(customer__sales_staff=request.user).values_list("customer__customer_id", flat=True)
-            customers = Customers.objects.filter(is_guest=False, pk__in=custody_customer_ids)
+            customers = Customers.objects.filter( pk__in=custody_customer_ids)
         
         if customers.exists():
             serializer = CustomerCustodyStockSerializer(customers, many=True)
@@ -5576,7 +5576,7 @@ class OutstandingAmountListAPI(APIView):
     def get(self, request, *args, **kwargs):
         id = request.user.id
         print("id",id)
-        customer=Customers.objects.filter(is_guest=False, sales_staff__id = id)
+        customer=Customers.objects.filter( sales_staff__id = id)
         print("customer",customer)
 
         custody_items = CustodyCustomItems.objects.filter(custody_custom__customer__in =customer)
@@ -5725,11 +5725,11 @@ class customer_outstanding(APIView):
             ).values_list('routes__route_id', flat=True)
 
             # Get all customers within the assigned routes
-            customers = Customers.objects.filter(is_guest=False, 
+            customers = Customers.objects.filter( 
                 routes__route_id__in=assigned_routes
             )
         else:
-            customers = Customers.objects.filter(is_guest=False, routes__pk=route_id)
+            customers = Customers.objects.filter( routes__pk=route_id)
 
         if customer_id:
             customers = customers.filter(pk=customer_id)
@@ -5794,7 +5794,7 @@ class CustomerCouponListAPI(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, format=None):
-        customers = Customers.objects.filter(is_guest=False, sales_type="CASH COUPON")
+        customers = Customers.objects.filter( sales_type="CASH COUPON")
 
         route_id = request.GET.get("route_id")
         customer_id = request.query_params.get("customer_id")
@@ -5851,7 +5851,7 @@ class CollectionAPI(APIView):
         customer_id = request.query_params.get('customer_id')
         # Filter CustomerSupply objects based on the user
         invoices_customer_pk = Invoice.objects.filter(invoice_status="non_paid",is_deleted=False).exclude(amout_total=0).values_list("customer__pk")
-        collection = Customers.objects.filter(is_guest=False, pk__in=invoices_customer_pk)
+        collection = Customers.objects.filter( pk__in=invoices_customer_pk)
         
         if customer_id:
             collection = collection.filter(pk=customer_id)
@@ -6927,7 +6927,7 @@ class StockMovementReportAPI(APIView):
 #         date_str = str(datetime.today().date())
 #         user_type = 'Salesman'
 
-#         today_visits = Customers.objects.filter(is_guest=False, sales_staff__user_type=user_type, sales_staff_id=salesman_id, visit_schedule=date_str)
+#         today_visits = Customers.objects.filter( sales_staff__user_type=user_type, sales_staff_id=salesman_id, visit_schedule=date_str)
 
 #         print('today_visits', today_visits)
        
@@ -6982,7 +6982,7 @@ class NonVisitedReportAPI(APIView):
 
             today_supplied = CustomerSupply.objects.filter(created_date__date=date)
             today_supplied_ids = today_supplied.values_list('customer_id', flat=True)
-            customers = Customers.objects.filter(is_guest=False, pk__in=today_customer_ids).exclude(pk__in=today_supplied_ids)
+            customers = Customers.objects.filter( pk__in=today_customer_ids).exclude(pk__in=today_supplied_ids)
 
             serializer = CustomerSupplySerializer(customers, many=True)
             return JsonResponse({'status': True, 'data': serializer.data, 'message': 'Pending Supply report passed!'})
@@ -6996,7 +6996,7 @@ class NonVisitedReportAPI(APIView):
     #         user_id = request.user.id
     #         print("user_id", user_id)
             
-    #         customer_objs = Customers.objects.filter(is_guest=False, sales_staff=user_id)
+    #         customer_objs = Customers.objects.filter( sales_staff=user_id)
             
     #         non_visited_customers = customer_objs.exclude(customersupply__salesman=user_id, customersupply__created_date__date=datetime.today().date())
             
@@ -7110,7 +7110,7 @@ class VisitStatisticsAPI(APIView):
             
             today_date = timezone.now().date()
             #new customers created
-            salesman_customers_count = Customers.objects.filter(is_guest=False, 
+            salesman_customers_count = Customers.objects.filter( 
                 created_date__date=today_date, 
                 sales_staff_id=user_id
             ).count()
@@ -7363,7 +7363,7 @@ class CustomerLoginApi(APIView):
         # try:
         mobile_number = request.data.get('mobile_number')
         password = request.data.get('password')
-        if (instances:=Customers.objects.filter(is_guest=False, mobile_no=mobile_number)).exists():
+        if (instances:=Customers.objects.filter( mobile_no=mobile_number)).exists():
             username = instances.first().user_id.username
             if username and password:
                 user = authenticate(username=username, password=password)
@@ -7560,7 +7560,7 @@ class PendingSupplyReportView(APIView):
 
             today_supplied = CustomerSupply.objects.filter(created_date__date=date)
             today_supplied_ids = today_supplied.values_list('customer_id', flat=True)
-            customers = Customers.objects.filter(is_guest=False, pk__in=today_customer_ids).exclude(pk__in=today_supplied_ids)
+            customers = Customers.objects.filter( pk__in=today_customer_ids).exclude(pk__in=today_supplied_ids)
 
             serializer = CustomerSupplySerializer(customers, many=True)
             return JsonResponse({'status': True, 'data': serializer.data, 'message': 'Pending Supply report passed!'})
@@ -7634,7 +7634,7 @@ class FreshcanEmptyBottleView(APIView):
             start_datetime = datetime.strptime(start_date, '%Y-%m-%d')
             end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
 
-            customers = Customers.objects.filter(is_guest=False, sales_staff__id=user_id)
+            customers = Customers.objects.filter( sales_staff__id=user_id)
             serialized_data = FreshCanVsEmptyBottleSerializer(customers, many=True, context={'start_date': start_datetime,'end_date':end_datetime}).data
 
             return Response({'status': True, 'data': serialized_data, 'message': 'Successfull'})
@@ -7661,7 +7661,7 @@ class CustodyReportView(APIView):
             end_datetime = datetime.strptime(end_date, '%Y-%m-%d')
 
             
-            customer_objs = Customers.objects.filter(is_guest=False, sales_staff=user_id)
+            customer_objs = Customers.objects.filter( sales_staff=user_id)
             serialized_data = CustomerCustodyReportSerializer(customer_objs,many=True, context={'start_date': start_datetime,'end_date':end_datetime}).data
             
             return Response({'status': True, 'data': serialized_data, 'message': 'Customer products list passed!'})
@@ -7677,7 +7677,7 @@ class FreshcanVsCouponView(APIView):
     def get(self, request, *args, **kwargs):
         try:
             user_id = request.user.id
-            customer_objs = Customers.objects.filter(is_guest=False, sales_staff=user_id)
+            customer_objs = Customers.objects.filter( sales_staff=user_id)
             start_date = request.data.get('start_date')
             end_date = request.data.get('end_date')
 
@@ -8234,7 +8234,7 @@ class PotentialBuyersAPI(APIView):
         except ValueError:
             return Response({"error": "Invalid date format. Use 'YYYY-MM-DD'."}, status=status.HTTP_400_BAD_REQUEST)
 
-        customers = Customers.objects.filter(is_guest=False, 
+        customers = Customers.objects.filter( 
             sales_staff=salesman,
             sales_type='CASH COUPON',
             created_date__gte=start_datetime,
@@ -8266,7 +8266,7 @@ class CustomerWiseCouponSaleAPIView(APIView):
         user_id = request.user.id
         print("user_id", user_id)
         
-        customer_objs = Customers.objects.filter(is_guest=False, sales_staff=user_id)
+        customer_objs = Customers.objects.filter( sales_staff=user_id)
         print("customer_objs", customer_objs)
         
         total_coupons = CustomerCouponStock.objects.filter(customer__in=customer_objs).aggregate(total=Sum('count'))['total'] or 0
@@ -11932,7 +11932,7 @@ class LeadCustomersView(APIView):
     def get(self, request, *args, **kwargs):
         many = True
         
-        instances = LeadCustomers.objects.filter(is_guest=False, created_by=request.user.pk)
+        instances = LeadCustomers.objects.filter( created_by=request.user.pk)
         
         if request.GET.get("pk"):
             instances = instances.filter(pk=request.GET.get("pk")).first()
@@ -12082,7 +12082,7 @@ class LeadCustomersUpdateStatusView(APIView):
                         "message": "Invalid status. Allowed values are 'cancel' or 'closed'."
                     }, status=status.HTTP_400_BAD_REQUEST)
 
-                customer_lead = LeadCustomers.objects.filter(is_guest=False, pk=lead_customer_id).first()
+                customer_lead = LeadCustomers.objects.filter( pk=lead_customer_id).first()
                 if not customer_lead:
                     log_activity(
                         created_by=request.user,
@@ -12351,7 +12351,7 @@ class CustomerRequestCreateAPIView(APIView):
 
     def post(self, request):
         user = request.user  # Get the logged-in user
-        customer = Customers.objects.filter(is_guest=False, user_id=user).first()
+        customer = Customers.objects.filter( user_id=user).first()
 
         if not customer:
             return Response(
@@ -13228,7 +13228,7 @@ class OverviewAPIView(APIView):
         door_lock_count = NonvisitReport.objects.filter(created_date__date=date, reason__reason_text="Door Lock").count()
         emergency_customers_count = customers_instances.filter(pk__in=DiffBottlesModel.objects.filter(delivery_date=date).values_list('customer__pk')).count()
 
-        new_customers_count_with_salesman = Customers.objects.filter(is_guest=False, created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username')
+        new_customers_count_with_salesman = Customers.objects.filter( created_date__date=date).values('sales_staff__username').annotate(customer_count=Count('customer_id')).order_by('sales_staff__username')
 
         data = {
             "cash_sales": total_cash_sales_count,
@@ -13601,7 +13601,7 @@ class CustomerStatisticsDashboardAPIView(APIView):
         # total_vocation_customers_count = vocation_customers_instances.count()
 
         # New Customers by Route
-        route_data = Customers.objects.filter(is_guest=False, routes__route_name__isnull=False).values(
+        route_data = Customers.objects.filter( routes__route_name__isnull=False).values(
             'routes__route_name'
         ).annotate(
             today_new_customers=Count('customer_id', filter=Q(created_date__date=today)),
@@ -13610,13 +13610,13 @@ class CustomerStatisticsDashboardAPIView(APIView):
 
         # Inactive Customers by Route
         for route in route_instances:
-            route_customers = Customers.objects.filter(is_guest=False, routes=route)
+            route_customers = Customers.objects.filter( routes=route)
 
             visited_customers = CustomerSupply.objects.filter(
                 created_date__date__range=(last_20_days, today)
             ).values_list('customer_id', flat=True)
 
-            todays_customers = Customers.objects.filter(is_guest=False, 
+            todays_customers = Customers.objects.filter( 
                 created_date__date=today, routes=route
             ).values_list('customer_id', flat=True)
 

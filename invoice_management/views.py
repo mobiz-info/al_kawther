@@ -42,7 +42,7 @@ from master.functions import log_activity
 @permission_classes((AllowAny,))
 @renderer_classes((JSONRenderer,))
 def get_building_no(request,route_id):
-    customers = Customers.objects.filter(is_guest=False, routes__pk=route_id)
+    customers = Customers.objects.filter( routes__pk=route_id)
     serialized = BuildingNameSerializers(customers, many=True, context={"request":request})
 
     response_data = {
@@ -55,7 +55,7 @@ def get_building_no(request,route_id):
 @permission_classes((AllowAny,))
 @renderer_classes((JSONRenderer,))
 def get_customer(request,route_id,building_no):
-    customers = Customers.objects.filter(is_guest=False, routes__pk=route_id,building_name=building_no)
+    customers = Customers.objects.filter( routes__pk=route_id,building_name=building_no)
     serialized = CustomersSerializers(customers, many=True, context={"request":request})
 
     response_data = {
@@ -425,7 +425,7 @@ def edit_invoice(request,pk):
         # )
                 
         route_instances = RouteMaster.objects.all()
-        building_names_queryset = Customers.objects.filter(is_guest=False, routes=invoice_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
+        building_names_queryset = Customers.objects.filter( routes=invoice_form.instance.customer.routes).values_list('building_name', flat=True).distinct()
         # building_names = [name for name in building_names_queryset if isinstance(name, str) and name.strip()]
         
 

@@ -66,7 +66,7 @@ def route_bottle_stock():
         total_bottle_count = 0
 
         # Fetch customers under this route
-        customers = Customers.objects.filter(is_guest=False, routes=route)
+        customers = Customers.objects.filter( routes=route)
 
         for customer in customers:
             custody_count = 0
@@ -140,7 +140,7 @@ def get_missed_customer_count(request, route_id, date):
     ).exclude(customer__pk__in=customer_ids).count()
 
     return {
-        'actual_customers': Customers.objects.filter(is_guest=False, routes__pk=route_id, is_active=True).count(),
+        'actual_customers': Customers.objects.filter( routes__pk=route_id, is_active=True).count(),
         'planned_visitors': len(planned_customers),
         'missed_customers': len(planned_customers) - supplied_customers_from_schedule,
         'supplied_customers_from_schedule': supplied_customers_from_schedule,

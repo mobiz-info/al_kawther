@@ -36,7 +36,7 @@ class Command(BaseCommand):
             sheet.cell(row=1, column=col_num, value=header)
 
         # Prepare customer queryset
-        customers = Customers.objects.filter(is_guest=False)
+        customers = Customers.objects.filter()
         if route_name:
             customers = customers.filter(routes__route_name=route_name)
 

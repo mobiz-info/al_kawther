@@ -16,7 +16,7 @@ class Command(BaseCommand):
             
             for dup in duplicates:
                 # Fetch customers with the duplicate custom_id
-                duplicate_customers = Customers.objects.filter(is_guest=False, custom_id=dup['custom_id'])
+                duplicate_customers = Customers.objects.filter( custom_id=dup['custom_id'])
                 
                 self.stdout.write(f"Custom ID: {dup['custom_id']}")
                 

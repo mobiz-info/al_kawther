@@ -16,7 +16,7 @@ class Command(BaseCommand):
         route = RouteMaster.objects.get(route_name="S-12B")
         date = datetime.datetime.strptime("2024-11-30", '%Y-%m-%d').date()
         
-        # customers = Customers.objects.filter(is_guest=False, routes=route)
+        # customers = Customers.objects.filter( routes=route)
         
         # for customer in customers:
         #     outstanding_in = CustomerOutstanding.objects.filter(created_date__date=customer,product_type='amount')

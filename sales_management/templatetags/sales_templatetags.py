@@ -253,7 +253,7 @@ def route_bottle_stock(route_id, key, date=None, end_date=None):
 
         # Get route details
         route = RouteMaster.objects.get(pk=route_id)
-        customer_ids = Customers.objects.filter(is_guest=False, routes=route).values_list('customer_id', flat=True)
+        customer_ids = Customers.objects.filter( routes=route).values_list('customer_id', flat=True)
 
 
         # Calculate custody stock for 5 Gallon

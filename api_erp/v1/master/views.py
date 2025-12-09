@@ -289,7 +289,7 @@ def customer(request):
             }, status=status.HTTP_404_NOT_FOUND)
 
     # Apply filtering only for active and not deleted customers
-    queryset = Customers.objects.filter(is_guest=False, is_active=True, is_deleted=False).order_by('-created_date')
+    queryset = Customers.objects.filter( is_active=True, is_deleted=False).order_by('-created_date')
 
     paginator = CustomPagination()
     result_page = paginator.paginate_queryset(queryset, request)
@@ -332,7 +332,7 @@ def sync_erp_customer(request):
 
             customer_ids = [instance.customer.customer_id for instance in instances]
             print("customer_ids",customer_ids)
-            Customers.objects.filter(is_guest=False, customer_id__in=customer_ids).update(is_exported=True)
+            Customers.objects.filter( customer_id__in=customer_ids).update(is_exported=True)
             
             return Response({"message": "Data stored successfully"}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

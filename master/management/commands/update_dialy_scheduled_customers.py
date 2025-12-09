@@ -24,7 +24,7 @@ class Command(BaseCommand):
             
             vocation_customer_ids = Vacation.objects.filter(start_date__gte=date,end_date__lte=date).values_list('customer__pk')
             
-            customers = Customers.objects.filter(is_guest=False, routes=route, is_calling_customer=False).exclude(pk__in=vocation_customer_ids)
+            customers = Customers.objects.filter( routes=route, is_calling_customer=False).exclude(pk__in=vocation_customer_ids)
             for customer in customers:
                 if customer.visit_schedule:
                     for day, weeks in customer.visit_schedule.items():
