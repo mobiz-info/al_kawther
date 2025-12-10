@@ -15,11 +15,11 @@ class Command(BaseCommand):
         start_date = make_aware(datetime(2025, 9, 1))
         end_date = make_aware(datetime(2025, 11, 30, 23, 59, 59))
 
-        route = "S-18"
+        # route = "S-18"
 
         invoices = Invoice.objects.filter(
             created_date__range=(start_date, end_date),
-            customer__routes__route_name=route,
+            # customer__routes__route_name=route,
             is_deleted=False
         ).exclude(invoice_no__isnull=True).exclude(invoice_no__exact="")
 
