@@ -83,18 +83,15 @@ class CustomerSupplyAdmin(admin.ModelAdmin):
 
 admin.site.register(CustomerSupply, CustomerSupplyAdmin)
 
-@admin.register(CustomerSupplyItems)
 class CustomerSupplyItemsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer_supply','get_custom_id', 'product', 'quantity',  'amount', 'get_created_date')
+    list_display = ('id', 'customer_supply','get_custom_id', 'product', 'quantity', 'amount', 'get_created_date')
     list_filter = ('product',)
     search_fields = ('customer_supply__customer__customer_name',)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        # Show only items from the latest 3 days (you can adjust this)
-        from datetime import timedelta, date
-        three_days_ago = date.today() - timedelta(days=3)
-        return qs.filter(customer_supply__created_date__date__gte=three_days_ago)
+        three_days_ago = timezone.now() - timedelta(days=3)
+        return qs.filter(customer_supply__created_date__gte=three_days_ago)
 
     def get_created_date(self, obj):
         return obj.customer_supply.created_date
@@ -104,7 +101,6 @@ class CustomerSupplyItemsAdmin(admin.ModelAdmin):
     def get_custom_id(self, obj):
         return obj.customer_supply.customer.custom_id
     get_custom_id.short_description = "Custom ID"
-    
     
 admin.site.register(CustomerSupplyStock)
 admin.site.register(CustomerCart)
