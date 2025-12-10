@@ -85,7 +85,7 @@ admin.site.register(CustomerSupply, CustomerSupplyAdmin)
 
 @admin.register(CustomerSupplyItems)
 class CustomerSupplyItemsAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer_supply','get_custom_id', 'product', 'quantity', 'rate', 'amount','foc', 'get_created_date')
+    list_display = ('id', 'customer_supply','get_custom_id', 'product', 'quantity',  'amount', 'get_created_date')
     list_filter = ('product',)
     search_fields = ('customer_supply__customer__customer_name',)
 
@@ -139,33 +139,32 @@ admin.site.register(CustodyCustomItems,CustodyCustomItemsAdmin)
 @admin.register(CustodyCustom)
 class CustodyCustomAdmin(admin.ModelAdmin):
     list_display = (
-        'custody_no',
         'customer',
         'agreement_no',
         'total_amount',
         'deposit_type',
         'reference_no',
         'amount_collected',
-        'sales_type',
+        
         'created_by',
         'created_date',
     )
-    list_filter = ('deposit_type', 'sales_type', 'created_date')
-    search_fields = ('custody_no', 'agreement_no', 'reference_no', 'customer__name')
+    list_filter = ('deposit_type',  'created_date')
+    search_fields = ( 'agreement_no', 'reference_no', 'customer__name')
     date_hierarchy = 'created_date'
-    readonly_fields = ('custody_no', 'created_date', 'modified_date')
+    readonly_fields = ( 'created_date', 'modified_date')
 
     fieldsets = (
         ('Custody Information', {
             'fields': (
                 'customer',
-                'custody_no',
+                
                 'agreement_no',
                 'total_amount',
                 'deposit_type',
                 'reference_no',
                 'amount_collected',
-                'sales_type',
+                
             )
         }),
         ('Audit Information', {
@@ -196,8 +195,8 @@ class CustomerCustodyStockAdmin(admin.ModelAdmin):
 admin.site.register(CustomerCustodyStock,CustomerCustodyStockAdmin)
 @admin.register(CustomerReturn)
 class CustomerReturnAdmin(admin.ModelAdmin):
-    list_display = ('return_no', 'customer_name', 'customer_route', 'deposit_type', 'created_date')
-    search_fields = ('return_no', 'customer__customer_name', 'customer__routes__route_name')
+    list_display = ( 'customer_name', 'customer_route', 'deposit_type', 'created_date')
+    search_fields = ( 'customer__customer_name', 'customer__routes__route_name')
     list_filter = ('deposit_type', 'created_date')
 
     def customer_name(self, obj):
