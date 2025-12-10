@@ -63,5 +63,5 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nFinished! Updated {updated_count} outstanding amount records for route {route}."
+            f"\nFinished! Updated {updated_count} outstanding amount records for route all."
         ))
