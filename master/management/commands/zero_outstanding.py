@@ -8,7 +8,7 @@ from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
-    help = "Fix mismatches: update OutstandingAmount to match Invoice.amount for route S-37"
+    help = "Update existing OutstandingAmount records to match Invoice amounts (NO CREATE, NO DELETE)."
 
     def handle(self, *args, **kwargs):
 
@@ -31,39 +31,37 @@ class Command(BaseCommand):
             invoice_no = inv.invoice_no
             customer = inv.customer
 
-            # Get or create outstanding header
-            outstanding, created = CustomerOutstanding.objects.get_or_create(
+            # Fetch existing CustomerOutstanding (NO CREATE)
+            outstanding = CustomerOutstanding.objects.filter(
                 customer=customer,
                 invoice_no=invoice_no,
-                product_type="amount",
-                defaults={
-                    "created_by": "system",
-                    "created_date": inv.created_date
-                }
-            )
+                product_type="amount"
+            ).first()
 
-            # Sum existing outstanding
-            existing_amount = OutstandingAmount.objects.filter(
+            if not outstanding:
+                continue  # skip if header not exist
+
+            # Fetch existing OutstandingAmount rows
+            outstanding_row = OutstandingAmount.objects.filter(
                 customer_outstanding=outstanding
-            ).aggregate(total=Sum('amount'))['total'] or 0
+            ).first()
 
-            if float(existing_amount) != float(invoice_amount):
+            if not outstanding_row:
+                continue  # skip if no amount row exists
 
-                # Remove existing rows
-                OutstandingAmount.objects.filter(customer_outstanding=outstanding).delete()
+            # Compare and update
+            if float(outstanding_row.amount) != float(invoice_amount):
 
-                # Create new correct row
-                OutstandingAmount.objects.create(
-                    customer_outstanding=outstanding,
-                    amount=invoice_amount
-                )
+                old_amount = outstanding_row.amount
+                outstanding_row.amount = invoice_amount
+                outstanding_row.save()
 
                 updated_count += 1
 
                 self.stdout.write(
-                    f"Updated {invoice_no}: outstanding {existing_amount} → {invoice_amount}"
+                    f"Updated {invoice_no}: {old_amount} → {invoice_amount}"
                 )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nCompleted! Fixed {updated_count} mismatched invoices for route {route}."
+            f"\nFinished! Updated {updated_count} outstanding amount records for route {route}."
         ))
