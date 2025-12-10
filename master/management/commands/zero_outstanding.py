@@ -15,7 +15,7 @@ class Command(BaseCommand):
         start_date = make_aware(datetime(2025, 9, 1))
         end_date = make_aware(datetime(2025, 11, 30, 23, 59, 59))
 
-        route = "S-11"
+        route = "S-12A"
 
         invoices = Invoice.objects.filter(
             created_date__range=(start_date, end_date),
