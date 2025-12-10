@@ -8,7 +8,7 @@ from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
-    help = "Update outstanding amounts ONLY when invoice_no matches exactly (route S-37)."
+    help = "Fix mismatches: update OutstandingAmount to match Invoice.amount for route S-37"
 
     def handle(self, *args, **kwargs):
 
@@ -31,39 +31,39 @@ class Command(BaseCommand):
             invoice_no = inv.invoice_no
             customer = inv.customer
 
-            # get ONLY the outstanding entry with SAME invoice_no
-            outstanding = CustomerOutstanding.objects.filter(
+            # Get or create outstanding header
+            outstanding, created = CustomerOutstanding.objects.get_or_create(
                 customer=customer,
-                invoice_no=invoice_no,   # **** STRICT MATCH CHECK ****
-                product_type="amount"
-            ).first()
+                invoice_no=invoice_no,
+                product_type="amount",
+                defaults={
+                    "created_by": "system",
+                    "created_date": inv.created_date
+                }
+            )
 
-            # If outstanding does NOT exist → DO NOTHING
-            if not outstanding:
-                continue
-
-            # Sum its outstanding amounts
-            existing_total = OutstandingAmount.objects.filter(
+            # Sum existing outstanding
+            existing_amount = OutstandingAmount.objects.filter(
                 customer_outstanding=outstanding
             ).aggregate(total=Sum('amount'))['total'] or 0
 
-            # Update only mismatches
-            if float(existing_total) != float(invoice_amount):
+            if float(existing_amount) != float(invoice_amount):
 
-                # Delete old amounts
+                # Remove existing rows
                 OutstandingAmount.objects.filter(customer_outstanding=outstanding).delete()
 
-                # Insert correct updated row
+                # Create new correct row
                 OutstandingAmount.objects.create(
                     customer_outstanding=outstanding,
-                    amount=invoice_amount,
+                    amount=invoice_amount
                 )
 
                 updated_count += 1
+
                 self.stdout.write(
-                    f"UPDATED: Invoice {invoice_no} | Old: {existing_total} → New: {invoice_amount}"
+                    f"Updated {invoice_no}: outstanding {existing_amount} → {invoice_amount}"
                 )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nDone! Updated {updated_count} invoices where invoice_no matched and amount mismatched."
+            f"\nCompleted! Fixed {updated_count} mismatched invoices for route {route}."
         ))
