@@ -8,12 +8,12 @@ from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
-    help = "Update existing OutstandingAmount records to match Invoice amounts (NO CREATE, NO DELETE)."
+    help = "Fix mismatches: update OutstandingAmount to match Invoice.amount for route S-37"
 
     def handle(self, *args, **kwargs):
 
-        start_date = make_aware(datetime(2025, 9, 1))
-        end_date = make_aware(datetime(2025, 11, 30, 23, 59, 59))
+        start_date = make_aware(datetime(2024, 9, 1))
+        end_date = make_aware(datetime(2024, 11, 30, 23, 59, 59))
 
         route = "S-37"
 
@@ -31,37 +31,39 @@ class Command(BaseCommand):
             invoice_no = inv.invoice_no
             customer = inv.customer
 
-            # Fetch existing CustomerOutstanding (NO CREATE)
-            outstanding = CustomerOutstanding.objects.filter(
+            # Get or create outstanding header
+            outstanding, created = CustomerOutstanding.objects.get_or_create(
                 customer=customer,
                 invoice_no=invoice_no,
-                product_type="amount"
-            ).first()
+                product_type="amount",
+                defaults={
+                    "created_by": "system",
+                    "created_date": inv.created_date
+                }
+            )
 
-            if not outstanding:
-                continue  # skip if header not exist
-
-            # Fetch existing OutstandingAmount rows
-            outstanding_row = OutstandingAmount.objects.filter(
+            # Sum existing outstanding
+            existing_amount = OutstandingAmount.objects.filter(
                 customer_outstanding=outstanding
-            ).first()
+            ).aggregate(total=Sum('amount'))['total'] or 0
 
-            if not outstanding_row:
-                continue  # skip if no amount row exists
+            if float(existing_amount) != float(invoice_amount):
 
-            # Compare and update
-            if float(outstanding_row.amount) != float(invoice_amount):
+                # Remove existing rows
+                OutstandingAmount.objects.filter(customer_outstanding=outstanding).delete()
 
-                old_amount = outstanding_row.amount
-                outstanding_row.amount = invoice_amount
-                outstanding_row.save()
+                # Create new correct row
+                OutstandingAmount.objects.create(
+                    customer_outstanding=outstanding,
+                    amount=invoice_amount
+                )
 
                 updated_count += 1
 
                 self.stdout.write(
-                    f"Updated {invoice_no}: {old_amount} → {invoice_amount}"
+                    f"Updated {invoice_no}: outstanding {existing_amount} → {invoice_amount}"
                 )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\nFinished! Updated {updated_count} outstanding amount records for route {route}."
+            f"\nCompleted! Fixed {updated_count} mismatched invoices for route {route}."
         ))
