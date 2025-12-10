@@ -1,49 +1,68 @@
-import os
 from django.core.management.base import BaseCommand
-from django.db.models import Sum, Q
-from openpyxl import Workbook
-from accounts.models import Customers
+from django.db.models import Sum
+from django.utils.timezone import make_aware
+from datetime import datetime
+
+from invoice_management.models import Invoice
 from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
-    help = "Export all customers whose total outstanding amount = 0 into Excel"
+    help = "Check invoice vs outstanding mismatches for route S-37"
 
     def handle(self, *args, **kwargs):
-        self.stdout.write("Calculating customers with zero outstanding amount...")
 
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Zero Outstanding Customers"
+        start_date = make_aware(datetime(2024, 9, 1))
+        end_date = make_aware(datetime(2024, 11, 30, 23, 59, 59))
 
-        # Header row
-        ws.append(["Customer ID", "Customer Name", "Total Outstanding Amount"])
+        invoices = Invoice.objects.filter(
+            created_date__range=(start_date, end_date),
+            customer__routes__route_name="S-37",
+            is_deleted=False
+        )
 
-        # Fetch all customers
-        customers = Customers.objects.all()
+        mismatches = []
 
-        zero_count = 0
+        for inv in invoices:
 
-        for customer in customers:
-            # Get all outstanding records
-            outstanding_records = CustomerOutstanding.objects.filter(
+            invoice_amount = inv.amout_total or 0
+            invoice_no = inv.invoice_no
+            customer = inv.customer
+
+            outstanding = CustomerOutstanding.objects.filter(
                 customer=customer,
-                product_type="amount"     # Only amount type
-            )
+                invoice_no=invoice_no,
+                product_type="amount"
+            ).first()
 
-            total_amount = OutstandingAmount.objects.filter(
-                customer_outstanding__in=outstanding_records
-            ).aggregate(total=Sum("amount"))["total"] or 0
+            if not outstanding:
+                mismatches.append({
+                    "invoice_no": invoice_no,
+                    "customer": str(customer),
+                    "invoice_amount": float(invoice_amount),
+                    "outstanding_amount": 0,
+                    "status": "NO OUTSTANDING ENTRY"
+                })
+                continue
 
-            # Condition: total amount = 0
-            if total_amount == 0:
-                ws.append([customer.custom_id, customer.customer_name, 0])
-                zero_count += 1
+            outstanding_amount = OutstandingAmount.objects.filter(
+                customer_outstanding=outstanding
+            ).aggregate(total=Sum('amount'))['total'] or 0
 
-        filename = "zero_outstanding_customers.xlsx"
-        wb.save(filename)
+            # only mismatches
+            if float(invoice_amount) != float(outstanding_amount):
+                mismatches.append({
+                    "invoice_no": invoice_no,
+                    "customer": str(customer),
+                    "invoice_amount": float(invoice_amount),
+                    "outstanding_amount": float(outstanding_amount),
+                    "status": "NOT MATCH"
+                })
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Completed. {zero_count} customers found with zero outstanding amount."
-        ))
-        self.stdout.write(self.style.SUCCESS(f"Excel saved as: {filename}"))
+        # Print results
+        if mismatches:
+            self.stdout.write("\nMISMATCHED INVOICES:\n")
+            for r in mismatches:
+                self.stdout.write(str(r))
+        else:
+            self.stdout.write("All invoice amounts match outstanding amounts!")

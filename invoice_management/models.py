@@ -26,7 +26,7 @@ class Invoice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     reference_no = models.CharField(max_length=200)
     invoice_no = models.CharField(max_length=200)
-    invoice_number = models.IntegerField(null=True,blank=True)
+    # invoice_number = models.IntegerField(null=True,blank=True)
     invoice_type = models.CharField(max_length=200, choices=INVOICE_TYPES,default='cash_invoice')
     invoice_status = models.CharField(max_length=200, choices=INVOICE_STATUS,default='non_paid')
     created_date = models.DateTimeField()

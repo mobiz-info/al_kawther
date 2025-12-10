@@ -1,66 +1,60 @@
-import os
-import django
-import openpyxl
-from datetime import date
+from django.db.models import Sum
+from django.utils.timezone import make_aware
+from datetime import datetime
+from invoice_management.models import Invoice
+from client_management.models import CustomerOutstanding, OutstandingAmount
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
-django.setup()
+start_date = make_aware(datetime(2024, 9, 1))
+end_date = make_aware(datetime(2024, 11, 30, 23, 59, 59))
 
-from client_management.models import OutstandingAmount
-from django.db import connection
+# Filter invoices for route S-37
+invoices = Invoice.objects.filter(
+    created_date__range=(start_date, end_date),
+    customer__route="S-37",            # <-- CHANGE IF FIELD IS DIFFERENT
+    is_deleted=False
+).exclude(invoice_no__isnull=True).exclude(invoice_no__exact="")
 
-def get_zero_outstanding_last_month():
-    sql = """
-        SELECT 
-            ao.id,
-            ao.amount,
-            ao.customer_outstanding_id,
-            co.invoice_no
-        FROM client_management_outstandingamount ao
-        JOIN client_management_customeroutstanding co
-            ON ao.customer_outstanding_id = co.id
-        WHERE ao.amount = 0
-          AND DATE(co.created_date) BETWEEN %s AND %s
-        ORDER BY co.created_date DESC;
-    """
+results = []
 
-    start_date = "2025-09-25"
-    end_date = "2025-10-30"
+for inv in invoices:
 
-    with connection.cursor() as cursor:
-        cursor.execute(sql, [start_date, end_date])
-        columns = [col[0] for col in cursor.description]
-        rows = cursor.fetchall()
+    invoice_amount = inv.amout_total or 0
+    invoice_no = inv.invoice_no
+    customer = inv.customer
 
-    return [dict(zip(columns, row)) for row in rows]
+    # Find matching outstanding amount entry
+    outstanding = CustomerOutstanding.objects.filter(
+        customer=customer,
+        invoice_no=invoice_no,
+        product_type="amount"
+    ).first()
 
+    if not outstanding:
+        # Show only mismatches → outstanding missing is a mismatch
+        results.append({
+            "invoice_no": invoice_no,
+            "customer": str(customer),
+            "invoice_amount": float(invoice_amount),
+            "outstanding_amount": 0,
+            "status": "NO OUTSTANDING ENTRY"
+        })
+        continue
 
-def export_zero_outstanding_excel():
-    print("Generating Excel...")
+    # Calculate outstanding amount
+    outstanding_amount = OutstandingAmount.objects.filter(
+        customer_outstanding=outstanding
+    ).aggregate(total=Sum('amount'))['total'] or 0
 
-    data = get_zero_outstanding_last_month()
+    # We only want mismatches
+    if float(invoice_amount) != float(outstanding_amount):
+        results.append({
+            "invoice_no": invoice_no,
+            "customer": str(customer),
+            "invoice_amount": float(invoice_amount),
+            "outstanding_amount": float(outstanding_amount),
+            "status": "NOT MATCH"
+        })
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Zero Outstanding"
-
-    # Header row
-    ws.append(["ID", "Invoice No", "Amount", "Customer Outstanding ID"])
-
-    # Data rows
-    for row in data:
-        ws.append([
-            row["id"],
-            row["invoice_no"],
-            float(row["amount"]),
-            row["customer_outstanding_id"],
-        ])
-
-    file_name = "zero_outstanding.xlsx"
-    wb.save(file_name)
-
-    print(f"Excel created: {file_name}")
-
-
-# Run export
-export_zero_outstanding_excel()
+# Print mismatches
+for r in results:
+    print(r)
