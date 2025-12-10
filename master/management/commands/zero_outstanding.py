@@ -1,9 +1,9 @@
 import os
 from django.core.management.base import BaseCommand
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from openpyxl import Workbook
 from accounts.models import Customers
-from client_management.models import CustomerOutstanding
+from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
@@ -17,16 +17,25 @@ class Command(BaseCommand):
         ws.title = "Zero Outstanding Customers"
 
         # Header row
-        ws.append(["Customer ID", "Customer Name", "Total Outstanding"])
+        ws.append(["Customer ID", "Customer Name", "Total Outstanding Amount"])
 
+        # Fetch all customers
         customers = Customers.objects.all()
+
         zero_count = 0
 
         for customer in customers:
-            total_amount = CustomerOutstanding.objects.filter(
-                customer=customer
-            ).aggregate(total=Sum("total_amount"))["total"] or 0
+            # Get all outstanding records
+            outstanding_records = CustomerOutstanding.objects.filter(
+                customer=customer,
+                product_type="amount"     # Only amount type
+            )
 
+            total_amount = OutstandingAmount.objects.filter(
+                customer_outstanding__in=outstanding_records
+            ).aggregate(total=Sum("amount"))["total"] or 0
+
+            # Condition: total amount = 0
             if total_amount == 0:
                 ws.append([customer.custom_id, customer.customer_name, 0])
                 zero_count += 1
