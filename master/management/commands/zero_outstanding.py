@@ -12,8 +12,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
 
-        start_date = make_aware(datetime(2024, 9, 1))
-        end_date = make_aware(datetime(2024, 11, 30, 23, 59, 59))
+        start_date = make_aware(datetime(2025, 9, 1))
+        end_date = make_aware(datetime(2025, 11, 30, 23, 59, 59))
 
         route = "S-37"
 
