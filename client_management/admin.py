@@ -95,6 +95,7 @@ class CustomerSupplyItemsAdmin(admin.ModelAdmin):
     list_display = (
         'id',
         'customer_supply',
+        'get_invoice_no',      # Show Invoice No
         'get_custom_id',
         'product',
         'quantity',
@@ -102,11 +103,18 @@ class CustomerSupplyItemsAdmin(admin.ModelAdmin):
         'get_created_date',
     )
     list_filter = ('product',)
-    search_fields = ('customer_supply__customer__customer_name',)
+    search_fields = (
+        'customer_supply__invoice_no',       
+        'customer_supply__customer__customer_name',
+        'customer_supply__customer__custom_id',
+    )
 
-    # REMOVE the 3-day filter and show all data
     def get_queryset(self, request):
         return super().get_queryset(request)
+
+    def get_invoice_no(self, obj):
+        return obj.customer_supply.invoice_no
+    get_invoice_no.short_description = "Invoice No"
 
     def get_created_date(self, obj):
         return obj.customer_supply.created_date
