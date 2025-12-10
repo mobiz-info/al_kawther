@@ -93,43 +93,29 @@ admin.site.register(CustomerSupply, CustomerSupplyAdmin)
 @admin.register(CustomerSupplyItems)
 class CustomerSupplyItemsAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 
-        'get_custom_id', 
-        'customer_supply', 
-        'product', 
-        'quantity',  
-        'amount', 
+        'id',
+        'customer_supply',
+        'get_custom_id',
+        'product',
+        'quantity',
+        'amount',
         'get_created_date',
-        'leaf_count'
     )
     list_filter = ('product',)
-    search_fields = ('customer_supply__customer__customer_name', 'customer_supply__customer__custom_id')
+    search_fields = ('customer_supply__customer__customer_name',)
 
+    # REMOVE the 3-day filter and show all data
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        # Optional: show only items from the last 3 days
-        three_days_ago = timezone.now() - timedelta(days=3)
-        return qs.filter(customer_supply__created_date__gte=three_days_ago)
+        return super().get_queryset(request)
 
-    # Show customer custom ID
+    def get_created_date(self, obj):
+        return obj.customer_supply.created_date
+    get_created_date.admin_order_field = 'customer_supply__created_date'
+    get_created_date.short_description = 'Created Date'
+
     def get_custom_id(self, obj):
         return obj.customer_supply.customer.custom_id
     get_custom_id.short_description = "Custom ID"
-    get_custom_id.admin_order_field = 'customer_supply__customer__custom_id'
-
-    # Show created date from related CustomerSupply
-    def get_created_date(self, obj):
-        return obj.customer_supply.created_date
-    get_created_date.short_description = 'Created Date'
-    get_created_date.admin_order_field = 'customer_supply__created_date'
-
-    # Show leaf count from related coupons
-    def leaf_count(self, obj):
-        from django.db.models import Count
-        return obj.customer_supply.customer_supplycoupon_set.aggregate(
-            total=Count('leaf')
-        )['total']
-    leaf_count.short_description = 'Manual Coupon Leaf Count'
     
 admin.site.register(CustomerSupplyStock)
 admin.site.register(CustomerCart)
