@@ -8,20 +8,22 @@ from client_management.models import CustomerOutstanding, OutstandingAmount
 
 
 class Command(BaseCommand):
-    help = "Check invoice vs outstanding mismatches for route S-37"
+    help = "Update outstanding amounts ONLY when invoice_no matches exactly (route S-37)."
 
     def handle(self, *args, **kwargs):
 
         start_date = make_aware(datetime(2024, 9, 1))
         end_date = make_aware(datetime(2024, 11, 30, 23, 59, 59))
 
+        route = "S-37"
+
         invoices = Invoice.objects.filter(
             created_date__range=(start_date, end_date),
-            customer__routes__route_name="S-37",
+            customer__routes__route_name=route,
             is_deleted=False
-        )
+        ).exclude(invoice_no__isnull=True).exclude(invoice_no__exact="")
 
-        mismatches = []
+        updated_count = 0
 
         for inv in invoices:
 
@@ -29,40 +31,39 @@ class Command(BaseCommand):
             invoice_no = inv.invoice_no
             customer = inv.customer
 
+            # get ONLY the outstanding entry with SAME invoice_no
             outstanding = CustomerOutstanding.objects.filter(
                 customer=customer,
-                invoice_no=invoice_no,
+                invoice_no=invoice_no,   # **** STRICT MATCH CHECK ****
                 product_type="amount"
             ).first()
 
+            # If outstanding does NOT exist → DO NOTHING
             if not outstanding:
-                mismatches.append({
-                    "invoice_no": invoice_no,
-                    "customer": str(customer),
-                    "invoice_amount": float(invoice_amount),
-                    "outstanding_amount": 0,
-                    "status": "NO OUTSTANDING ENTRY"
-                })
                 continue
 
-            outstanding_amount = OutstandingAmount.objects.filter(
+            # Sum its outstanding amounts
+            existing_total = OutstandingAmount.objects.filter(
                 customer_outstanding=outstanding
             ).aggregate(total=Sum('amount'))['total'] or 0
 
-            # only mismatches
-            if float(invoice_amount) != float(outstanding_amount):
-                mismatches.append({
-                    "invoice_no": invoice_no,
-                    "customer": str(customer),
-                    "invoice_amount": float(invoice_amount),
-                    "outstanding_amount": float(outstanding_amount),
-                    "status": "NOT MATCH"
-                })
+            # Update only mismatches
+            if float(existing_total) != float(invoice_amount):
 
-        # Print results
-        if mismatches:
-            self.stdout.write("\nMISMATCHED INVOICES:\n")
-            for r in mismatches:
-                self.stdout.write(str(r))
-        else:
-            self.stdout.write("All invoice amounts match outstanding amounts!")
+                # Delete old amounts
+                OutstandingAmount.objects.filter(customer_outstanding=outstanding).delete()
+
+                # Insert correct updated row
+                OutstandingAmount.objects.create(
+                    customer_outstanding=outstanding,
+                    amount=invoice_amount,
+                )
+
+                updated_count += 1
+                self.stdout.write(
+                    f"UPDATED: Invoice {invoice_no} | Old: {existing_total} → New: {invoice_amount}"
+                )
+
+        self.stdout.write(self.style.SUCCESS(
+            f"\nDone! Updated {updated_count} invoices where invoice_no matched and amount mismatched."
+        ))
