@@ -88,50 +88,48 @@ class CustomerSupplyAdmin(admin.ModelAdmin):
     search_fields = ('customer__customer_name','invoice_no')  # Search by customer name (ForeignKey field)
 
 admin.site.register(CustomerSupply, CustomerSupplyAdmin)
+
+@admin.register(CustomerSupplyItems)
 class CustomerSupplyItemsAdmin(admin.ModelAdmin):
-
-    # Showing fields from CustomerSupplyItems + parent invoice + parent amount_recieved
     list_display = (
-        'id',
-        'invoice_no',
-        'customer_name',
-        'product',
-        'quantity',
-        'rate',
-        'amount',
-        'foc',
-        'amount_recieved',     # From CustomerSupply
-        'created_date',
+        'id', 
+        'get_custom_id', 
+        'customer_supply', 
+        'product', 
+        'quantity',  
+        'amount', 
+        'get_created_date',
+        'leaf_count'
     )
+    list_filter = ('product',)
+    search_fields = ('customer_supply__customer__customer_name', 'customer_supply__customer__custom_id')
 
-    # Enable invoice search
-    search_fields = (
-        'customer_supply__invoice_no',
-        'customer_supply__customer__customer_name',
-    )
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Optional: show only items from the last 3 days
+        three_days_ago = timezone.now() - timedelta(days=3)
+        return qs.filter(customer_supply__created_date__gte=three_days_ago)
 
-    # ====================================================
-    # Custom display methods (because parent fields must be accessed)
-    # ====================================================
-    def invoice_no(self, obj):
-        return obj.customer_supply.invoice_no
-    invoice_no.short_description = "Invoice No"
+    # Show customer custom ID
+    def get_custom_id(self, obj):
+        return obj.customer_supply.customer.custom_id
+    get_custom_id.short_description = "Custom ID"
+    get_custom_id.admin_order_field = 'customer_supply__customer__custom_id'
 
-    def customer_name(self, obj):
-        return obj.customer_supply.customer.customer_name
-    customer_name.short_description = "Customer"
-
-    def amount_recieved(self, obj):
-        return obj.customer_supply.amount_recieved
-    amount_recieved.short_description = "Amount Received"
-
-    def created_date(self, obj):
+    # Show created date from related CustomerSupply
+    def get_created_date(self, obj):
         return obj.customer_supply.created_date
-    created_date.short_description = "Created Date"
+    get_created_date.short_description = 'Created Date'
+    get_created_date.admin_order_field = 'customer_supply__created_date'
 
-
-admin.site.register(CustomerSupplyItems, CustomerSupplyItemsAdmin)
-
+    # Show leaf count from related coupons
+    def leaf_count(self, obj):
+        from django.db.models import Count
+        return obj.customer_supply.customer_supplycoupon_set.aggregate(
+            total=Count('leaf')
+        )['total']
+    leaf_count.short_description = 'Manual Coupon Leaf Count'
+    
 admin.site.register(CustomerSupplyStock)
 admin.site.register(CustomerCart)
 admin.site.register(CustomerCartItems)
