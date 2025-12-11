@@ -18,7 +18,7 @@ class CustomerOutstandingAdmin(admin.ModelAdmin):
     list_display = ('id','invoice_no','created_by','created_date','product_type','customer')
     ordering = ("-created_date",)
     search_fields = ('invoice_no','customer__custom_id')
-
+    autocomplete_fields = ['customer']
     def delete_button(self, obj):
         delete_url = reverse('admin:%s_%s_delete' % (obj._meta.app_label, obj._meta.model_name), args=[obj.id])
         return format_html('<a href="{}" class="button" style="color:red;">Delete</a>', delete_url)
@@ -42,7 +42,7 @@ class CustomerOutstandingAmountAdmin(admin.ModelAdmin):
     search_fields = ('customer_outstanding__invoice_no','customer_outstanding__customer__customer_name',)
     list_filter = ['customer_outstanding__created_date'] 
     ordering = ("-customer_outstanding__created_date",)
-    autocomplete_fields = ['customer']
+    
     def invoice_no(self, obj):
         return obj.customer_outstanding.invoice_no
     invoice_no.admin_order_field = 'customer_outstanding__invoice_no'
