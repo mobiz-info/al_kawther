@@ -152,7 +152,7 @@
                                             <a href="{% url 'view_invoice' invoice_no=instance.invoice_no %}" aria-label="anchor" class="btn btn-info-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="View Invoice">
                                                 <span class="ri-file-text-fill fs-14"></span>  <!-- Adjust icon as needed -->
                                             </a>
-                                            {% if instance.can_edit %}
+                                            {% comment %} {% if instance.can_edit %} {% endcomment %}
                                             <a href="{% url 'edit_customer_supply' pk=instance.pk %}" aria-label="anchor" class="btn btn-primary-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Edit">
                                                 <span class="ri-pencil-line fs-14"></span>
                                             </a>
@@ -160,7 +160,7 @@
                                             <a aria-label="anchor" class="action-button remove btn btn-danger-light btn-sm ms-2" data-bs-toggle="tooltip" data-bs-original-title="Delete"
                                                 data-id="{{instance.pk}}" data-text="{{confirm_delete_message}}" data-title="Are you sure?" href="{% url 'delete_customer_supply' pk=instance.pk %}"><span class="ri-delete-bin-7-line fs-14"></span>
                                             </a>
-                                            {% endif %}
+                                            {% comment %} {% endif %} {% endcomment %}
                                         </div>
                                     </td>
                                 </tr>
