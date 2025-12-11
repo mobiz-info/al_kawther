@@ -3450,84 +3450,143 @@ def create_customer_outstanding(request):
         
         return render(request,'client_management/customer_outstanding/create.html',context)
 
-
 @login_required
 def delete_outstanding(request, pk):
-    """
-    outstanding deletion, it only mark as is deleted field to true
-    :param request:
-    :param pk:
-    :return:
-    """
+
+    import traceback
+
     try:
         with transaction.atomic():
+
+            # -------- LOAD MAIN OUTSTANDING ----------
             customer_outstanding = CustomerOutstanding.objects.get(pk=pk)
-            report = CustomerOutstandingReport.objects.filter(customer=customer_outstanding.customer)
-            
+
+            # -------- LOAD REPORT BASE QUERY ----------
+            report_qs = CustomerOutstandingReport.objects.filter(
+                customer=customer_outstanding.customer
+            )
+
+            # ============================================================
+            #   HANDLE PRODUCT TYPE REDUCTION IN REPORT
+            # ============================================================
+
             if customer_outstanding.product_type == "amount":
-                amount = OutstandingAmount.objects.get(customer_outstanding=customer_outstanding).amount
-                report = report.filter(product_type="amount").first()
-                report.value -= amount
-            if customer_outstanding.product_type == "emptycan":
-                emptycan = OutstandingProduct.objects.get(customer_outstanding=customer_outstanding).empty_bottle
-                report = report.filter(product_type="emptycan").first()
-                report.value -= emptycan
-            if customer_outstanding.product_type == "coupons":
-                coupons = OutstandingCoupon.objects.filter(customer_outstanding=customer_outstanding).aggregate(total_count=Sum('count'))['total_count'] or 0
-                report = report.filter(product_type="coupons").first()
-                report.value -= coupons
-            
-            report.save()
-            
-            if (invoices:=Invoice.objects.filter(invoice_no=customer_outstanding.invoice_no)).exists():
-                for invoice in invoices:
-                    if CustomerSupply.objects.filter(invoice_no=invoice.invoice_no).exists():
-                        customer_supply_instance = get_object_or_404(CustomerSupply, invoice_no=invoice.invoice_no)
-                        supply_items_instances = CustomerSupplyItems.objects.filter(customer_supply=customer_supply_instance)
-                        five_gallon_qty = supply_items_instances.filter(product__product_name="5 Gallon").aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
-                        
-                        DiffBottlesModel.objects.filter(
-                            delivery_date__date=customer_supply_instance.created_date.date(),
-                            assign_this_to=customer_supply_instance.salesman,
-                            customer=customer_supply_instance.customer_id
-                            ).update(status='pending')
-                    
-                        # Handle coupon deletions and adjustments
-                        handle_coupons(customer_supply_instance, five_gallon_qty)
-                        
-                        # Update van product stock and empty bottle counts
-                        update_van_product_stock(customer_supply_instance, supply_items_instances, five_gallon_qty)
-                        
-                        # Mark customer supply and items as deleted
-                        customer_supply_instance.delete()
-                        supply_items_instances.delete()
-                        
-                        if CustomerCoupon.objects.filter(invoice_no=invoice.invoice_no).exists():
-                            instance = CustomerCoupon.objects.get(invoice_no=invoice.invoice_no)
-                            delete_coupon_recharge(instance.invoice_no)
-                            
-                    invoice.is_deleted=True
-                    invoice.save()
-                    
-                    InvoiceItems.objects.filter(invoice=invoice).update(is_deleted=True)
-            
-            customer_outstanding.delete()
-            
+                amount_obj = OutstandingAmount.objects.filter(
+                    customer_outstanding=customer_outstanding
+                ).first()
+                amount_value = amount_obj.amount if amount_obj else 0
+
+                report = report_qs.filter(product_type="amount").first()
+                if report:
+                    report.value = (report.value or 0) - amount_value
+                    report.save()
+
+            elif customer_outstanding.product_type == "emptycan":
+                empty_obj = OutstandingProduct.objects.filter(
+                    customer_outstanding=customer_outstanding
+                ).first()
+                empty_value = empty_obj.empty_bottle if empty_obj else 0
+
+                report = report_qs.filter(product_type="emptycan").first()
+                if report:
+                    report.value = (report.value or 0) - empty_value
+                    report.save()
+
+            elif customer_outstanding.product_type == "coupons":
+                coupons_total = OutstandingCoupon.objects.filter(
+                    customer_outstanding=customer_outstanding
+                ).aggregate(total=Sum("count"))["total"] or 0
+
+                report = report_qs.filter(product_type="coupons").first()
+                if report:
+                    report.value = (report.value or 0) - coupons_total
+                    report.save()
+
+            # ============================================================
+            #       HANDLE INVOICE & CUSTOMER SUPPLY DELETIONS
+            # ============================================================
+
+            invoices = Invoice.objects.filter(invoice_no=customer_outstanding.invoice_no)
+
+            for invoice in invoices:
+
+                customer_supply = CustomerSupply.objects.filter(
+                    invoice_no=invoice.invoice_no
+                ).first()
+
+                if customer_supply:
+
+                    supply_items = CustomerSupplyItems.objects.filter(
+                        customer_supply=customer_supply
+                    )
+
+                    five_gallon_qty = supply_items.filter(
+                        product__product_name="5 Gallon"
+                    ).aggregate(q=Sum("quantity"))["q"] or 0
+
+                    # Update diff bottles
+                    DiffBottlesModel.objects.filter(
+                        delivery_date__date=customer_supply.created_date.date(),
+                        assign_this_to=customer_supply.salesman,
+                        customer=customer_supply.customer_id
+                    ).update(status="pending")
+
+                    # Handle coupon adjustments
+                    try:
+                        handle_coupons(customer_supply, five_gallon_qty)
+                    except Exception as e:
+                        print("Coupon handler error:", e)
+
+                    # Update van stock
+                    try:
+                        update_van_product_stock(customer_supply, supply_items, five_gallon_qty)
+                    except Exception as e:
+                        print("Van stock update error:", e)
+
+                    # SOFT DELETE customer supply
+                    customer_supply.is_deleted = True
+                    customer_supply.save()
+
+                    # SOFT DELETE supply items
+                    supply_items.update(is_deleted=True)
+
+                    # Delete coupon recharge if exists
+                    coupon_obj = CustomerCoupon.objects.filter(
+                        invoice_no=invoice.invoice_no
+                    ).first()
+                    if coupon_obj:
+                        delete_coupon_recharge(coupon_obj.invoice_no)
+
+                # SOFT DELETE invoice
+                invoice.is_deleted = True
+                invoice.save()
+
+                # SOFT DELETE invoice items
+                InvoiceItems.objects.filter(invoice=invoice).update(is_deleted=True)
+
+            # ============================================================
+            #       FINALLY DELETE OUTSTANDING
+            # ============================================================
+            customer_outstanding.is_deleted = True
+            customer_outstanding.save()
+
             log_activity(
                 created_by=request.user,
                 description=f"Outstanding record with ID {pk} was successfully deleted."
             )
-            
+
             status_code = status.HTTP_200_OK
             response_data = {
-            "status": "true",
-            "title": "Succesfully Deleted",
-            "message": "Succesfully Deleted",
-            "reload": "true",
+                "status": "true",
+                "title": "Succesfully Deleted",
+                "message": "Succesfully Deleted",
+                "reload": "true",
             }
-            
-    except IntegrityError as e:
-        # Handle database integrity error
+
+    except Exception as e:
+        print("DELETE OUTSTANDING ERROR:")
+        print(traceback.format_exc())
+
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         response_data = {
             "status": "false",
@@ -3535,15 +3594,105 @@ def delete_outstanding(request, pk):
             "message": str(e),
         }
 
-    except Exception as e:
-        # Handle other exceptions
-        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        response_data = {
-            "status": "false",
-            "title": "Failed",
-            "message": str(e),
-        }
-    return HttpResponse(json.dumps(response_data), status=status_code, content_type='application/javascript')
+    return HttpResponse(
+        json.dumps(response_data),
+        status=status_code,
+        content_type="application/javascript"
+    )
+
+# @login_required
+# def delete_outstanding(request, pk):
+#     """
+#     outstanding deletion, it only mark as is deleted field to true
+#     :param request:
+#     :param pk:
+#     :return:
+#     """
+#     try:
+#         with transaction.atomic():
+#             customer_outstanding = CustomerOutstanding.objects.get(pk=pk)
+#             report = CustomerOutstandingReport.objects.filter(customer=customer_outstanding.customer)
+            
+#             if customer_outstanding.product_type == "amount":
+#                 amount = OutstandingAmount.objects.get(customer_outstanding=customer_outstanding).amount
+#                 report = report.filter(product_type="amount").first()
+#                 report.value -= amount
+#             if customer_outstanding.product_type == "emptycan":
+#                 emptycan = OutstandingProduct.objects.get(customer_outstanding=customer_outstanding).empty_bottle
+#                 report = report.filter(product_type="emptycan").first()
+#                 report.value -= emptycan
+#             if customer_outstanding.product_type == "coupons":
+#                 coupons = OutstandingCoupon.objects.filter(customer_outstanding=customer_outstanding).aggregate(total_count=Sum('count'))['total_count'] or 0
+#                 report = report.filter(product_type="coupons").first()
+#                 report.value -= coupons
+            
+#             report.save()
+            
+#             if (invoices:=Invoice.objects.filter(invoice_no=customer_outstanding.invoice_no)).exists():
+#                 for invoice in invoices:
+#                     if CustomerSupply.objects.filter(invoice_no=invoice.invoice_no).exists():
+#                         customer_supply_instance = get_object_or_404(CustomerSupply, invoice_no=invoice.invoice_no)
+#                         supply_items_instances = CustomerSupplyItems.objects.filter(customer_supply=customer_supply_instance)
+#                         five_gallon_qty = supply_items_instances.filter(product__product_name="5 Gallon").aggregate(total_qty=Sum('quantity'))['total_qty'] or 0
+                        
+#                         DiffBottlesModel.objects.filter(
+#                             delivery_date__date=customer_supply_instance.created_date.date(),
+#                             assign_this_to=customer_supply_instance.salesman,
+#                             customer=customer_supply_instance.customer_id
+#                             ).update(status='pending')
+                    
+#                         # Handle coupon deletions and adjustments
+#                         handle_coupons(customer_supply_instance, five_gallon_qty)
+                        
+#                         # Update van product stock and empty bottle counts
+#                         update_van_product_stock(customer_supply_instance, supply_items_instances, five_gallon_qty)
+                        
+#                         # Mark customer supply and items as deleted
+#                         customer_supply_instance.delete()
+#                         supply_items_instances.delete()
+                        
+#                         if CustomerCoupon.objects.filter(invoice_no=invoice.invoice_no).exists():
+#                             instance = CustomerCoupon.objects.get(invoice_no=invoice.invoice_no)
+#                             delete_coupon_recharge(instance.invoice_no)
+                            
+#                     invoice.is_deleted=True
+#                     invoice.save()
+                    
+#                     InvoiceItems.objects.filter(invoice=invoice).update(is_deleted=True)
+            
+#             customer_outstanding.delete()
+            
+#             log_activity(
+#                 created_by=request.user,
+#                 description=f"Outstanding record with ID {pk} was successfully deleted."
+#             )
+            
+#             status_code = status.HTTP_200_OK
+#             response_data = {
+#             "status": "true",
+#             "title": "Succesfully Deleted",
+#             "message": "Succesfully Deleted",
+#             "reload": "true",
+#             }
+            
+#     except IntegrityError as e:
+#         # Handle database integrity error
+#         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+#         response_data = {
+#             "status": "false",
+#             "title": "Failed",
+#             "message": str(e),
+#         }
+
+#     except Exception as e:
+#         # Handle other exceptions
+#         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+#         response_data = {
+#             "status": "false",
+#             "title": "Failed",
+#             "message": str(e),
+#         }
+#     return HttpResponse(json.dumps(response_data), status=status_code, content_type='application/javascript')
 
 # customer count
 
