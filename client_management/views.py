@@ -544,8 +544,8 @@ def customer_supply_list(request):
             description=f"Searched customer supplies with query: {query}"
         )
         
-    for instance in instances:
-        instance.can_edit = (timezone.now().date() - instance.created_date.date()).days <= 3
+    # for instance in instances:
+    #     instance.can_edit = (timezone.now().date() - instance.created_date.date()).days <= 3
         
     context = {
         'instances': instances,
