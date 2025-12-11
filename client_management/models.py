@@ -442,6 +442,9 @@ class CustomerOutstanding(models.Model):
     def __str__(self):
         return str(self.product_type)
     
+    def _str_(self):
+        return f"{self.invoice_no} — {self.customer.customer_name}"
+    
     def get_outstanding_count(self):
         if self.product_type == 'amount':
             return OutstandingAmount.objects.filter(customer_outstanding=self).aggregate(total_amount=Sum('amount'))['total_amount'] or 0
